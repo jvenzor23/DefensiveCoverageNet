@@ -21,6 +21,7 @@ library(magick)
 library(fitdistrplus)
 library(skewt)
 library(sn)
+library(broom)
 
 # Reading in The Data -----------------------------------------------------
 
@@ -28,7 +29,7 @@ players = read.csv("~/Desktop/CoverageNet/inputs/players.csv")
 games = read.csv("~/Desktop/CoverageNet/inputs/games.csv")
 plays = read.csv("~/Desktop/CoverageNet/inputs/plays.csv")
 targeted_receiver = read.csv("~/Desktop/CoverageNet/inputs/targetedReceiver.csv")
-epa_tracking_total = read.csv("~/Desktop/CoverageNet/src/03_coverageNet/03_score_tracking/outputs/routes_tracking_epa2.csv")
+epa_tracking_total = read.csv("~/Desktop/CoverageNet/src/03_coverageNet/03_score_tracking/outputs/routes_tracking_epa.csv")
 wr_db_man_matchups = read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/man_defense_off_coverage_assignments.csv")
 
 
@@ -211,4 +212,183 @@ max_man_coverage_tracking_score = max_man_coverage_tracking %>%
              by = c("nflId_def" = "nflId")) %>%
   arrange(desc(normalized_avg_max_epa))
 
-             
+
+# Fitting a Monotonic Function to Each Player -----------------------------
+
+fitted_max_man_coverage_tracking = max_man_coverage_tracking %>%
+  ungroup() %>%
+  filter(time_after_snap <= min(max_time_after_snap))
+  
+library(scam)
+
+# Break up d by state, then fit the specified model to each piece and
+# return a list
+models <- plyr::dlply(fitted_max_man_coverage_tracking, "nflId_def", function(df) 
+  scam(avg_max_epa ~ s(time_after_snap, k = 12, bs = "mpi"), data = df))
+
+# Apply coef to each model and return a data frame
+fit_by_player = plyr::ldply(models, fitted.values)
+
+fit_by_player2 = fit_by_player %>%
+  pivot_longer(cols = setdiff(names(fit_by_player), "nflId_def"),
+               names_to = "time_after_snap_placeholder",
+               values_to = "avg_max_epa_pred") %>%
+  group_by(nflId_def) %>%
+  mutate(time_after_snap = row_number()*.1 + .4) %>%
+  dplyr::select(-time_after_snap_placeholder)
+
+fitted_max_man_coverage_tracking2 = fitted_max_man_coverage_tracking %>%
+  mutate(time_after_snap = as.factor(time_after_snap)) %>%
+  inner_join(fit_by_player2 %>%
+               mutate(time_after_snap = as.factor(time_after_snap))) %>%
+  inner_join(full_probs_df %>%
+               mutate(time_after_snap = as.factor(time_after_snap))) %>%
+  group_by(nflId_def) %>%
+  mutate(prob_norm = prob/sum(prob)) %>%
+  group_by(nflId_def) %>%
+  summarize(normalized_avg_max_epa = sum(avg_max_epa_pred*prob_norm)) %>%
+  inner_join(wr_db_man_matchups %>%
+               group_by(nflId_def) %>%
+               summarize(routes = n())) %>%
+  inner_join(players %>%
+               dplyr::select(nflId, displayName),
+             by = c("nflId_def" = "nflId")) %>%
+  arrange(desc(normalized_avg_max_epa))
+
+
+# Adjusting for WR Skill --------------------------------------------------
+
+wr_under_150_skill1 = epa_tracking_total %>%
+  inner_join(wr_db_man_matchups,
+             by = c("gameId", "playId", "targetNflId" = "nflId_off")) %>%
+  inner_join(wr_db_man_matchups %>%
+               group_by(nflId_off) %>%
+               summarize(count = n()) %>%
+               filter(count <= 50) %>%
+               distinct(nflId_off),
+             by = c("targetNflId" = "nflId_off")) %>%
+  group_by(gameId, playId, targetNflId) %>%
+  mutate(time_after_snap = (5 + (frameId - min(frameId)))*.1) %>%
+  ungroup() %>%
+  group_by(gameId, playId, targetNflId) %>%
+  mutate(epa_pass_attempt_max = cummax(epa_pass_attempt)) %>%
+  ungroup() %>%
+  group_by(time_after_snap) %>%
+  summarise(count = n(),
+            avg_max_epa = mean(epa_pass_attempt_max)) %>%
+  mutate(targetNflId = 1)
+
+wr_skill1 = epa_tracking_total %>%
+  inner_join(wr_db_man_matchups,
+             by = c("gameId", "playId", "targetNflId" = "nflId_off")) %>%
+  group_by(gameId, playId, targetNflId) %>%
+  mutate(time_after_snap = (5 + (frameId - min(frameId)))*.1) %>%
+  ungroup() %>%
+  group_by(gameId, playId, targetNflId) %>%
+  mutate(epa_pass_attempt_max = cummax(epa_pass_attempt)) %>%
+  ungroup() %>%
+  group_by(targetNflId, time_after_snap) %>%
+  summarise(count = n(),
+            avg_max_epa = mean(epa_pass_attempt_max)) %>%
+  anti_join(wr_db_man_matchups %>%
+              group_by(nflId_off) %>%
+              summarize(count = n()) %>%
+              filter(count < 50) %>%
+              distinct(nflId_off),
+            by = c("targetNflId" = "nflId_off")) %>%
+  arrange(targetNflId, time_after_snap) %>%
+  group_by(targetNflId) %>%
+  mutate(max_time_after_snap = max(time_after_snap)) %>%
+  ungroup()
+
+fitted_wr_skill1 = wr_skill1 %>%
+  ungroup() %>%
+  filter(time_after_snap <= min(max_time_after_snap))
+
+# Break up d by state, then fit the specified model to each piece and
+# return a list
+models <- plyr::dlply(fitted_wr_skill1, "targetNflId", function(df) 
+  scam(avg_max_epa ~ s(time_after_snap, k = 12, bs = "mpi"), data = df))
+
+# Apply coef to each model and return a data frame
+fit_by_wr = plyr::ldply(models, fitted.values)
+
+fit_by_wr2 = fit_by_wr %>%
+  pivot_longer(cols = setdiff(names(fit_by_wr), "targetNflId"),
+               names_to = "time_after_snap_placeholder",
+               values_to = "avg_max_epa_pred") %>%
+  group_by(targetNflId) %>%
+  mutate(time_after_snap = row_number()*.1 + .4) %>%
+  dplyr::select(-time_after_snap_placeholder)
+
+fitted_wr_skill2 = fitted_wr_skill1 %>%
+  mutate(time_after_snap = as.factor(time_after_snap)) %>%
+  inner_join(fit_by_wr2 %>%
+               mutate(time_after_snap = as.factor(time_after_snap))) %>%
+  inner_join(full_probs_df %>%
+               distinct(time_after_snap, prob) %>%
+               mutate(time_after_snap = as.factor(time_after_snap))) %>%
+  group_by(targetNflId) %>%
+  mutate(prob_norm = prob/sum(prob)) %>%
+  group_by(targetNflId) %>%
+  summarize(normalized_avg_max_epa = sum(avg_max_epa_pred*prob_norm)) %>%
+  inner_join(wr_db_man_matchups %>%
+               rename(targetNflId=nflId_off) %>%
+               group_by(targetNflId) %>%
+               summarize(routes = n())) %>%
+  inner_join(players %>%
+               dplyr::select(nflId, displayName),
+             by = c("targetNflId" = "nflId")) %>%
+  arrange(desc(normalized_avg_max_epa))
+
+# Break up d by state, then fit the specified model to each piece and
+# return a list
+models <- plyr::dlply(wr_under_150_skill1, "targetNflId", function(df) 
+  scam(avg_max_epa ~ s(time_after_snap, k = 12, bs = "mpi"), data = df))
+
+# Apply coef to each model and return a data frame
+fit_by_wr_under_150 = plyr::ldply(models, fitted.values)
+
+fit_by_wr_under_150_2 = fit_by_wr_under_150 %>%
+  pivot_longer(cols = setdiff(names(fit_by_wr_under_150), "targetNflId"),
+               names_to = "time_after_snap_placeholder",
+               values_to = "avg_max_epa_pred") %>%
+  group_by(targetNflId) %>%
+  mutate(time_after_snap = row_number()*.1 + .4) %>%
+  dplyr::select(-time_after_snap_placeholder)
+
+wr_under_150_skill2 = wr_under_150_skill1 %>%
+  mutate(time_after_snap = as.factor(time_after_snap)) %>%
+  inner_join(fit_by_wr_under_150_2 %>%
+               mutate(time_after_snap = as.factor(time_after_snap))) %>%
+  inner_join(full_probs_df %>%
+               distinct(time_after_snap, prob) %>%
+               mutate(time_after_snap = as.factor(time_after_snap))) %>%
+  group_by(targetNflId) %>%
+  mutate(prob_norm = prob/sum(prob)) %>%
+  group_by(targetNflId) %>%
+  summarize(normalized_avg_max_epa = sum(avg_max_epa_pred*prob_norm))
+
+db_matchup_difficulty = epa_tracking_total %>%
+  inner_join(wr_db_man_matchups,
+             by = c("gameId", "playId", "targetNflId" = "nflId_off")) %>%
+  anti_join(wr_db_man_matchups %>%
+              group_by(nflId_def) %>%
+              summarize(count = n()) %>%
+              filter(count < 125) %>%
+              distinct(nflId_def) %>%
+              rename()) %>%
+  distinct(gameId, playId, targetNflId, nflId_def) %>%
+  left_join(fitted_wr_skill2 %>%
+              dplyr::select(-routes, -displayName))
+
+db_matchup_difficulty$normalized_avg_max_epa[is.na(db_matchup_difficulty$normalized_avg_max_epa)] = wr_under_150_skill2$normalized_avg_max_epa
+
+db_matchup_difficulty2 = db_matchup_difficulty %>%
+  group_by(nflId_def) %>%
+  summarize(wr_normalized_avg_max_epa = mean(normalized_avg_max_epa))
+
+db_matchup_difficulty3 = fitted_max_man_coverage_tracking2 %>%
+  inner_join(db_matchup_difficulty2) %>%
+  mutate(eps = wr_normalized_avg_max_epa - normalized_avg_max_epa) %>%
+  arrange(desc(eps))

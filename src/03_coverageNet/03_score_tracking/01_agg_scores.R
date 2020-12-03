@@ -14,6 +14,7 @@ library(lubridate)
 library(reticulate)
 library(gganimate)
 library(nnet)
+library(scam)
 
 # Reading in The Data -----------------------------------------------------
 
@@ -82,11 +83,18 @@ max_epa_tracking_total_time_agg = epa_tracking_total %>%
             avg_max_epa = mean(epa_pass_attempt_max)) %>%
   arrange(time_after_snap)
 
+fitted_vals <- scam(avg_max_epa ~ s(time_after_snap, k = 12, bs = "mpi"), 
+                    data = max_epa_tracking_total_time_agg)$fitted.values
+
+max_epa_tracking_total_time_agg$fitted_vals = fitted_vals
+
 max_epa_tracking_total_time_agg %>%
   ggplot() +
   geom_point(aes(x = time_after_snap, y = avg_max_epa)) +
+  geom_line(aes(x = time_after_snap, y = fitted_vals), color = "blue") +
   xlim(0, 8) +
   ylim(0, 1)
+
 
 epa_tracking_total %>%
   group_by(gameId, playId, targetNflId) %>%
@@ -141,7 +149,7 @@ max_best_epa_tracking_total_time_agg %>%
 epa_at_pass_attempt_metrics = epa_tracking_total %>%
   inner_join(plays %>%
                filter(passResult %in% c('C','I','INT')) %>%
-               select(gameId, playId)) %>%
+               dplyr::select(gameId, playId)) %>%
   group_by(gameId, playId, targetNflId) %>%
   mutate(time_after_snap = (5 + (frameId - min(frameId)))*.1) %>%
   ungroup() %>%
@@ -183,19 +191,87 @@ epa_at_pass_attempt_metrics = epa_tracking_total %>%
             perc_best_epa_targeted = mean(best_epa_targeted),
             perc_best_epa_at_some_point_targeted = mean(best_epa_at_some_point_targeted)) %>%
   mutate(plays_perc = count/sum(count)) %>%
-  select(time_after_snap, count, plays_perc, everything()) %>%
+  dplyr::select(time_after_snap, count, plays_perc, everything()) %>%
   filter(count > 10)
 
 
-# Checking the Time of Pass Attempt Metrics -------------------------------
+# Checking EPA By Route -------------------------------
 
-pass_attempt_epa_data = read.csv("~/Desktop/CoverageNet/src/03_coverageNet/02_score_attempt/outputs/pass_attempt_epa_data.csv")
+setwd("~/Desktop/CoverageNet/src/00_data_wrangle/outputs/")
+files = dir()[startsWith(dir(), "week")]
 
-check = epa_tracking_total %>%
+routes = data.frame()
+
+for(file in files){
+  
+  pt_data = read.csv(paste0("~/Desktop/CoverageNet/src/00_data_wrangle/outputs/",
+                            file))
+  
+  pt_data2 = pt_data %>%
+    filter(route != "") %>%
+    distinct(gameId, playId, nflId, route)
+  
+  routes = rbind(routes, pt_data2)
+
+}
+
+epa_change_by_route = epa_tracking_total %>%
+  inner_join(routes,
+             by = c("gameId", "playId", "targetNflId" = "nflId")) %>%
   group_by(gameId, playId, targetNflId) %>%
-  filter(frameId == max(frameId)) %>%
-  inner_join(targeted_receiver) %>%
-  left_join(pass_attempt_epa_data %>%
-              select(gameId, playId, epa_pass_attempt) %>%
-              rename(epa = epa_pass_attempt))
+  mutate(epa_change = epa_pass_attempt - epa_pass_attempt[1],
+         time_after_snap = (5 + (frameId - min(frameId)))*.1) %>%
+  group_by(time_after_snap, route) %>%
+  summarize(avg_epa_change = mean(epa_change),
+            avg_comp_perc = mean(C_prob)) %>%
+  arrange(route, time_after_snap) %>%
+  filter(time_after_snap < 6)
 
+
+epa_change_by_route %>%
+  filter(route != "undefined") %>%
+  ggplot() +
+  geom_line(aes(x = time_after_snap, 
+                y = avg_epa_change)) +
+  facet_wrap(~route)
+
+epa_max_by_route = epa_tracking_total %>%
+  inner_join(routes,
+             by = c("gameId", "playId", "targetNflId" = "nflId")) %>%
+  group_by(gameId, playId, targetNflId) %>%
+  mutate(time_after_snap = (5 + (frameId - min(frameId)))*.1) %>%
+  ungroup() %>%
+  group_by(gameId, playId, targetNflId) %>%
+  mutate(epa_pass_attempt_max = cummax(epa_pass_attempt)) %>%
+  ungroup() %>%
+  group_by(time_after_snap, route) %>%
+  summarize(avg_max_epa = mean(epa_pass_attempt_max)) %>%
+  arrange(route, time_after_snap) %>%
+  group_by(route) %>%
+  mutate(max_time_after_snap = max(time_after_snap)) %>%
+  ungroup() %>%
+  filter(time_after_snap <= min(max_time_after_snap))
+
+# Break up d by state, then fit the specified model to each piece and
+# return a list
+models <- plyr::dlply(epa_max_by_route, "route", function(df) 
+  scam(avg_max_epa ~ s(time_after_snap, k = 12, bs = "mpi"), data = df))
+
+# Apply coef to each model and return a data frame
+fit_by_route = plyr::ldply(models, fitted.values)
+
+fit_by_route2 = fit_by_route %>%
+  pivot_longer(cols = setdiff(names(fit_by_route), "route"),
+               names_to = "time_after_snap_placeholder",
+               values_to = "epa_pass_attempt_max_pred") %>%
+  group_by(route) %>%
+  mutate(time_after_snap = row_number()*.1 + .4) %>%
+  select(-time_after_snap_placeholder)
+
+epa_max_by_route2 = epa_max_by_route %>%
+  mutate(time_after_snap = as.factor(time_after_snap)) %>%
+  inner_join(fit_by_route2 %>%
+              mutate(time_after_snap = as.factor(time_after_snap)))
+
+# Print the summary of each model
+l_ply(models, summary, .print = TRUE)

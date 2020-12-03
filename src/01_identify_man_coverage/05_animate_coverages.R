@@ -32,7 +32,7 @@ plays = read.csv("~/Desktop/CoverageNet/inputs/plays.csv")
 targeted_receiver = read.csv("~/Desktop/CoverageNet/inputs/targetedReceiver.csv")
 coverages_week1 = read.csv("~/Desktop/CoverageNet/inputs/coverages_week1.csv")
 
-pbp_data = read.csv("~/Desktop/CoverageNet/src/00_data_wrangle/outputs/week1.csv")
+pbp_data = read.csv("~/Desktop/CoverageNet/src/00_data_wrangle/outputs/week13.csv")
 
 man_assignments = read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/man_defense_off_coverage_assignments.csv")
 
@@ -47,12 +47,12 @@ man_zone_classification = read.csv("~/Desktop/CoverageNet/src/01_identify_man_co
 # Making the line segments df ---------------------------------------------
 man_assignments_segment_plt =  man_assignments %>%
   inner_join(pbp_data %>%
-               select(gameId, playId, nflId, frameId, x, y) %>%
+               dplyr::select(gameId, playId, nflId, frameId, x, y) %>%
                rename(nflId_off = nflId,
                       x_off = x,
                       y_off = y)) %>%
   inner_join(pbp_data %>%
-               select(gameId, playId, nflId, frameId, x, y) %>%
+               dplyr::select(gameId, playId, nflId, frameId, x, y) %>%
                rename(nflId_def = nflId,
                       x_def = x,
                       y_def = y))
@@ -133,9 +133,9 @@ man_assignments_segment_plt =  man_assignments %>%
 example.play = pbp_data %>%
   inner_join(
     pbp_data %>%
-      select(gameId, playId) %>%
-      filter(gameId == 2018091001,
-            playId == 3385) %>%
+      dplyr::select(gameId, playId) %>%
+      filter(gameId == 2018120212,
+            playId == 3786) %>%
       # distinct()
       sample_n(1)
   )
@@ -152,10 +152,9 @@ example_zones = example.play %>%
 
 example.play.info = plays %>%
   inner_join(example.play %>%
-               select(gameId, playId) %>%
+               dplyr::select(gameId, playId) %>%
                distinct()) %>%
-  inner_join(targeted_receiver) %>%
-  inner_join(coverages_week1)
+  inner_join(targeted_receiver)
 
 
 ## General field boundaries
@@ -201,8 +200,8 @@ animate.play =
                                       fill = team, group = nflId, size = team, colour = team), alpha = 0.7) + 
   geom_text(data = example.play, aes(x = (xmax-y), y = x + 10, label = jerseyNumber), colour = "white", 
             vjust = 0.36, size = 3.5) + 
-  # geom_segment(aes(x = (xmax - y_off), y = x_off + 10, xend = (xmax - y_def), yend = x_def + 10, group = nflId_def), 
-  #              color = "black", data = example_man_assignments_segment_plt) + 
+  geom_segment(aes(x = (xmax - y_off), y = x_off + 10, xend = (xmax - y_def), yend = x_def + 10, group = nflId_def), 
+                color = "black", data = example_man_assignments_segment_plt) + 
   ylim(ymin, ymax) + 
   coord_fixed() +  
   theme(axis.line=element_blank(),
