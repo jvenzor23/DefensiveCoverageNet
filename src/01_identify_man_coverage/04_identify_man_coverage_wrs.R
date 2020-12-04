@@ -26,13 +26,13 @@ targeted_receiver = read.csv("~/Desktop/CoverageNet/inputs/targetedReceiver.csv"
 
 man_zone_classification = rbind(
   read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/corners_pass_attempts_man_zone_classes.csv") %>%
-    select(gameId, playId, nflId, zone_probability),
+    dplyr::select(gameId, playId, nflId, zone_probability),
   read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/corners_sacks_man_zone_classes.csv") %>%
-    select(gameId, playId, nflId, zone_probability),
+    dplyr::select(gameId, playId, nflId, zone_probability),
   read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/safeties_pass_attempts_man_zone_classes.csv") %>%
-    select(gameId, playId, nflId, zone_probability),
+    dplyr::select(gameId, playId, nflId, zone_probability),
   read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/safeties_sacks_man_zone_classes.csv") %>%
-    select(gameId, playId, nflId, zone_probability)
+    dplyr::select(gameId, playId, nflId, zone_probability)
 ) %>%
   arrange(gameId, playId, nflId)
 
@@ -89,32 +89,32 @@ for(file in files){
   pbp_data_man_plays3 = pbp_data_man_plays2 %>%
     anti_join(pbp_data_man_plays2 %>%
                 filter(event == 'qb_spike') %>%
-                select(gameId, playId))
+                dplyr::select(gameId, playId))
   
   # getting rid of error prone plays (approx 3 out of 1032)
   check = pbp_data_man_plays3 %>%
     group_by(gameId, playId) %>%
     summarize(events = max(time_period)) %>%
     inner_join(plays %>%
-                 select(gameId, playId, passResult))
+                 dplyr::select(gameId, playId, passResult))
   
   clean_plays = check %>%
     filter(events >= 2) %>%
     filter((events == 3)|(passResult == 'S')) %>%
-    select(gameId, playId)
+    dplyr::select(gameId, playId)
   
   pbp_data_man_plays4 = pbp_data_man_plays3 %>%
     inner_join(clean_plays) %>%
-    select(-ends_with("_flag"))
+    dplyr::select(-ends_with("_flag"))
   
   pbp_data_dbs_in_man = pbp_data_man_plays4 %>%
     inner_join(man_coverage %>%
                  distinct(gameId, playId, nflId)) %>%
-    filter(time_period == 1)
+    filter(time_period %in% c(1, 2))
   
   pbp_data_offense = pbp_data_man_plays4 %>%
     filter(IsOnOffense,
-           time_period == 1) %>%
+           time_period %in% c(1, 2)) %>%
     rename(x_off = x,
            y_off = y,
            dir_off = dir,
@@ -122,7 +122,7 @@ for(file in files){
            nflId_off = nflId,
            s_off = s,
            position_off = position) %>%
-    select(gameId, playId, frameId, nflId_off, ends_with("_off"))
+    dplyr::select(gameId, playId, frameId, nflId_off, ends_with("_off"))
   
   pbp_data_pre_agg = pbp_data_dbs_in_man %>%
     inner_join(pbp_data_offense) %>%
@@ -136,7 +136,7 @@ for(file in files){
                  filter(event == "ball_snap",
                         is.na(nflId)) %>%
                  distinct(gameId, playId, .keep_all = TRUE) %>%
-                 select(gameId, playId, x, y) %>%
+                 dplyr::select(gameId, playId, x, y) %>%
                  rename(x_snap = x,
                         y_snap = y)) %>%
     mutate(x_rot_45 = (x - x_snap)*cos(pi/4) - (y - y_snap)*sin(pi/4),
@@ -149,7 +149,7 @@ for(file in files){
               avg_sep = mean(dist),
               sep_at_end = max(dist_last_frame)) %>%
     mutate(movement_cor = pmax(movement_cor, movement_cor2)) %>%
-    select(-movement_cor2)
+    dplyr::select(-movement_cor2)
   
   
   qb_data_pre_agg = pbp_data_pre_agg %>%
@@ -165,21 +165,23 @@ for(file in files){
     group_by(gameId, playId, nflId) %>%
     filter(movement_cor > 0,
            (avg_sep < 10)|(movement_cor > .95),
-           avg_sep < 15) %>%
+           avg_sep < 15,
+           sep_at_end < 12.5) %>%
     # logic to say, elimiate something if cor is way worse, with sep at end not much
     # better
     mutate(max_cor = max(movement_cor),
-           max_cor_sep_at_end = sep_at_end[which.max(movement_cor)]) %>%
+           max_cor_sep_at_end = sep_at_end[which.max(movement_cor)],
+           max_avg_sep = avg_sep[which.max(movement_cor)]) %>%
     mutate(cor_reduction = (movement_cor - max_cor)/(max_cor),
            sep_at_end_improve = (max_cor_sep_at_end - sep_at_end)/max_cor_sep_at_end) %>%
-    filter((cor_reduction > -.25)|(sep_at_end_improve > .50)) %>%
-    filter(avg_sep == min(avg_sep)) 
+    filter(((cor_reduction > -.25)&(sep_at_end_improve > .30))|(movement_cor == max(movement_cor))) %>%
+    filter(sep_at_end == min(sep_at_end))
   
   # checking if they rushed
   pbp_data_agg2 = pbp_data_agg %>%
     inner_join(qb_data_pre_agg %>%
                 ungroup() %>%
-                select(gameId, playId, nflId, sep_at_end) %>%
+                dplyr::select(gameId, playId, nflId, sep_at_end) %>%
                 rename(qb_sep_at_end = sep_at_end), 
               by = c("gameId", "playId", "nflId")) %>%
     filter(qb_sep_at_end > sep_at_end,
@@ -187,7 +189,7 @@ for(file in files){
   
   # final df
   matchups_final = pbp_data_agg2 %>%
-    select(gameId, playId, nflId, nflId_off) %>%
+    dplyr::select(gameId, playId, nflId, nflId_off) %>%
     rename(nflId_def = nflId) %>%
     distinct(gameId, playId, nflId_def, .keep_all = TRUE)
   
@@ -195,7 +197,7 @@ for(file in files){
                                matchups_final)
   
   write.csv(matchups_final_write,
-            "~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/man_defense_off_coverage_assignments.csv",
+            "~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/man_defense_off_coverage_assignments2.csv",
             row.names = FALSE)
   
 }
@@ -208,11 +210,11 @@ def_players_count = matchups_final_write %>%
   summarize(man_count = n()) %>%
   arrange(desc(man_count)) %>%
   inner_join(players %>%
-               select(nflId, displayName, position), by = c("nflId_def" = "nflId")) %>%
-  select(displayName, position, everything())
+               dplyr::select(nflId, displayName, position), by = c("nflId_def" = "nflId")) %>%
+  dplyr::select(displayName, position, everything())
 
 
-# Looking at epa with targeted reciever -----------------------------------
+# Looking at epa with targeted receiever -----------------------------------
 
 epa_when_targeted = matchups_final_write %>%
   inner_join(targeted_receiver) %>%

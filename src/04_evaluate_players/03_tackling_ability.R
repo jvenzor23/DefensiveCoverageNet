@@ -164,10 +164,19 @@ tackling_ability = pass_result_epa %>%
   left_join(wr_db_man_matchups %>%
               group_by(nflId_def) %>%
               summarize(count = n()) %>%
-              filter(count >= 125) %>%
+              filter(count >= 100) %>%
               distinct(nflId_def) %>%
               mutate(qualifying = 1)) %>%
   mutate(qualifying = replace_na(qualifying, 0)) %>%
   dplyr::select(qualifying, position, displayName, nflId_def, everything()) %>%
   arrange(desc(qualifying), desc(eps_tackling))
+
+tackling_ability[is.na(tackling_ability)] = 0
+
+tackling_ability = tackling_ability %>%
+  mutate(tackle_perc = Tackles/tackling_opportunities)
+
+write.csv(tackling_ability,
+          "~/Desktop/CoverageNet/src/04_evaluate_players/outputs/player_tackling_epas.csv",
+          row.names = FALSE)
             

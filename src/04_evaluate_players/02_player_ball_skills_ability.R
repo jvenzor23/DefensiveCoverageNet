@@ -233,7 +233,7 @@ ball_skills_ability2 = ball_skills_ability %>%
   left_join(wr_db_man_matchups %>%
               group_by(nflId_def) %>%
               summarize(count = n()) %>%
-              filter(count >= 125) %>%
+              filter(count >= 100) %>%
               distinct(nflId_def) %>%
               mutate(qualifying = 1)) %>%
   mutate(qualifying = replace_na(qualifying, 0)) %>%
