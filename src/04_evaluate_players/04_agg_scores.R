@@ -92,3 +92,7 @@ skills_table = player_tracking_skills %>%
          accurate_targets = targets) %>%
   arrange(desc(qualifying), desc(eps_man_coverage)) %>%
   filter(!is.na(eps_man_coverage))
+
+write.csv(skills_table,
+          "~/Desktop/CoverageNet/src/04_evaluate_players/outputs/overall_player_skills_summary.csv",
+          row.names = FALSE)
