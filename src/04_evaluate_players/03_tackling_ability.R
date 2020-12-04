@@ -150,7 +150,7 @@ tackling_ability = pass_result_epa %>%
                rename(targetNflId = nflId_off)) %>%
   inner_join(plays_no_penalties %>%
                distinct(gameId, playId)) %>%
-  anti_join(fumbles_forced_remove) %>%
+  anti_join(fumbles_forced_remove2) %>%
   group_by(nflId_def) %>%
   summarize(tackling_opportunities = n(),
             eps_tackling = -1*sum(epa_yac),

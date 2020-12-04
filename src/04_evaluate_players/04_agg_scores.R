@@ -77,9 +77,18 @@ skills_table = player_tracking_skills %>%
   left_join(player_tackling_skills) %>%
   mutate(eps_man_coverage = eps_tracking_w_penalties + eps_saved_closing_w_penalties +
            eps_saved_ball_skills_w_penalties + eps_tackling,
-         eps_per_man_route = eps_man_coverage/routes) %>%
-  dplyr::select("qualifying", "position", "displayName", "nflId_def", "routes", "targets",
-         "eps_man_coverage","eps_tracking_w_penalties","eps_saved_closing_w_penalties",
+         eps_per_man_route = eps_man_coverage/routes,
+         tracking_penalties = penalities_count,
+         closing_penalties = closing_penalties,
+         ball_skills_penalties = ball_skills_penalties) %>%
+  dplyr::select("qualifying", "position", "displayName", "nflId_def", "eps_man_coverage",
+                "routes", "targets",
+                "completions", "PB", "interceptions","Tackles", "FF", 
+                "tracking_penalties","closing_penalties","ball_skills_penalties","eps_tracking_w_penalties","eps_saved_closing_w_penalties",
          "eps_saved_ball_skills_w_penalties","eps_tackling") %>%
+  rename(INT = interceptions,
+         T = Tackles,
+         completions_allowed = completions,
+         accurate_targets = targets) %>%
   arrange(desc(qualifying), desc(eps_man_coverage)) %>%
   filter(!is.na(eps_man_coverage))
