@@ -182,6 +182,16 @@ ball_skills_defensive_penalties_score = closing_defensive_penalties_remove %>%
   dplyr::select(gameId, playId, nflId_def2, penaltyCodes, enforced_flag, declined_flag, offsetting_flag, my_epa) %>%
   rename(nflId_def = nflId_def2)
 
+ball_skills_defensive_penalties_man_avg = (ball_skills_defensive_penalties_score %>%
+    filter(penaltyCodes == "DPI") %>%
+    ungroup() %>%
+    summarize(avg_penalty_epa_per_target = mean(my_epa)))$avg_penalty_epa_per_target*dim(ball_skills_defensive_penalties_score)[1]/
+  (dim(ball_skills_defensive_penalties_score)[1] + dim(pass_arrived_epa %>%
+                                                         inner_join(targeted_receiver) %>%
+                                                         inner_join(wr_db_man_matchups,
+                                                                   by = c("gameId", "playId", "targetNflId" = "nflId_off")) %>%
+                                                                      distinct(gameId, playId))[1])
+
 # Joining the Data --------------------------------------------------------
 
 ball_skills_ability = pass_arrived_epa %>%
@@ -264,7 +274,8 @@ ball_skills_ability3[is.na(ball_skills_ability3)] = 0
 ball_skills_ability3 = ball_skills_ability3 %>%
   mutate(eps_saved_ball_skills_per_target_w_penalties = (eps_saved_ball_skills_per_target*targets + 
                                                       ball_skills_penalties*avg_ball_skills_penalties_eps)/(avg_ball_skills_penalties_eps + targets),
-         eps_saved_ball_skills_w_penalties = eps_saved_ball_skills + ball_skills_penalties*avg_ball_skills_penalties_eps,
+         eps_saved_ball_skills_w_penalties = eps_saved_ball_skills + ball_skills_penalties*avg_ball_skills_penalties_eps + 
+           ball_skills_defensive_penalties_man_avg*(ball_skills_penalties + targets),
          hands_on_ball_plays = interceptions + PB,
          hands_on_ball_rate = hands_on_ball_plays/(targets + ball_skills_penalties)) %>%
   arrange(desc(qualifying), desc(eps_saved_ball_skills_w_penalties))

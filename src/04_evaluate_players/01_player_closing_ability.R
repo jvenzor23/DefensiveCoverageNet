@@ -113,6 +113,16 @@ closing_defensive_penalties_score = closing_defensive_penalties_remove %>%
   dplyr::select(gameId, playId, nflId_def2, penaltyCodes, enforced_flag, declined_flag, offsetting_flag, my_epa) %>%
   rename(nflId_def = nflId_def2)
 
+
+closing_defensive_penalties_man_avg = pass_attempt_epa %>%
+  inner_join(targeted_receiver) %>%
+  left_join(wr_db_man_matchups,
+            by = c("gameId", "playId", "targetNflId" = "nflId_off")) %>%
+  left_join(closing_defensive_penalties_remove %>%
+              filter(penaltyCodes == "DPI")) %>%
+  ungroup() %>%
+  summarize(avg_penalty_epa_per_target = mean(replace_na(my_epa, 0)))
+
 # Joining the Data --------------------------------------------------------
 
 closing_ability = pass_attempt_epa %>%
@@ -182,7 +192,8 @@ closing_ability3[is.na(closing_ability3)] = 0
 closing_ability3 = closing_ability3 %>%
   mutate(eps_saved_closing_per_target_w_penalties = (eps_saved_closing_per_target*targets + 
            closing_penalties*avg_closing_penalties_eps)/(avg_closing_penalties_eps + targets),
-         eps_saved_closing_w_penalties = eps_saved_closing + closing_penalties*avg_closing_penalties_eps) %>%
+         eps_saved_closing_w_penalties = eps_saved_closing + closing_penalties*avg_closing_penalties_eps +
+           (closing_defensive_penalties_man_avg$avg_penalty_epa_per_target)*(targets + closing_penalties)) %>%
   dplyr::select(position, displayName, nflId_def, targets, closing_penalties,
                 eps_saved_closing_w_penalties, eps_saved_closing, starts_with("eps_saved"),epa_pass_attempt_avg) %>%
   left_join(wr_db_man_matchups %>%

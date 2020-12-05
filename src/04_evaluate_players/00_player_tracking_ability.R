@@ -136,6 +136,11 @@ tracking_defensive_penalties2 = tracking_defensive_penalties %>%
   dplyr::select(gameId, playId, nflId, penaltyCodes, enforced_flag, offsetting_flag, my_epa) %>%
   rename(nflId_def = nflId)
 
+tracking_defensive_penalties_man_avg = wr_db_man_matchups %>%
+  left_join(tracking_defensive_penalties2) %>%
+  ungroup() %>%
+  summarize(avg_penalty_epa_per_route = mean(replace_na(my_epa, 0)))
+
 
 # Removing Penalty Plays From Scoring Data Set ----------------------------
 
@@ -387,7 +392,8 @@ fitted_max_man_coverage_tracking3[is.na(fitted_max_man_coverage_tracking3)] = 0
 fitted_max_man_coverage_tracking3 = fitted_max_man_coverage_tracking3 %>%
   mutate(penalties_and_time_to_throw_normalized_tracking_epa = (routes*normalized_avg_max_epa + 
                       penalities_count*avg_epa_penalty)/(routes + penalities_count),
-         eps_tracking_w_penalties = eps_tracking + penalties_eps,
+         eps_tracking_w_penalties = eps_tracking + penalties_eps + 
+           (tracking_defensive_penalties_man_avg$avg_penalty_epa_per_route)*(routes + avg_epa_penalty),
          tracking_penalty_perc = penalities_count/(penalities_count + routes)) %>%
   dplyr::select(displayName, nflId_def, routes, eps_tracking_w_penalties, eps_tracking, normalized_avg_max_epa, penalties_and_time_to_throw_normalized_tracking_epa,
                 penalities_count, tracking_penalty_perc, penalties_eps) %>%
