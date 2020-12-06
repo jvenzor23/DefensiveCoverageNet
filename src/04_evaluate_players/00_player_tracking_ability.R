@@ -368,9 +368,9 @@ fitted_max_man_coverage_tracking2 = fitted_max_man_coverage_tracking2 %>%
             eps_tracking_per_play = sum(eps_tracking_per_play*prob_norm)) %>%
   mutate(eps_tracking = eps_tracking_per_play*routes) %>%
   inner_join(players %>%
-               dplyr::select(nflId, displayName),
+               dplyr::select(position, nflId, displayName),
              by = c("nflId_def" = "nflId")) %>%
-  dplyr::select(displayName, nflId_def, routes, eps_tracking, eps_tracking_per_play, normalized_avg_max_epa) %>%
+  dplyr::select(position, displayName, nflId_def, routes, eps_tracking, eps_tracking_per_play, normalized_avg_max_epa) %>%
   arrange(desc(eps_tracking))
 
 
@@ -395,7 +395,7 @@ fitted_max_man_coverage_tracking3 = fitted_max_man_coverage_tracking3 %>%
          eps_tracking_w_penalties = eps_tracking + penalties_eps + 
            (tracking_defensive_penalties_man_avg$avg_penalty_epa_per_route)*(routes + avg_epa_penalty),
          tracking_penalty_perc = penalities_count/(penalities_count + routes)) %>%
-  dplyr::select(displayName, nflId_def, routes, eps_tracking_w_penalties, eps_tracking, normalized_avg_max_epa, penalties_and_time_to_throw_normalized_tracking_epa,
+  dplyr::select(position, displayName, nflId_def, routes, eps_tracking_w_penalties, eps_tracking, normalized_avg_max_epa, penalties_and_time_to_throw_normalized_tracking_epa,
                 penalities_count, tracking_penalty_perc, penalties_eps) %>%
   arrange(penalties_and_time_to_throw_normalized_tracking_epa) %>%
   left_join(wr_db_man_matchups %>%

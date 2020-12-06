@@ -73,10 +73,19 @@ on_target_comp_perc = (plays %>%
 skills_table = player_tracking_skills %>%
   left_join(player_closing_skills %>%
               dplyr::select(-targets)) %>%
-  left_join(player_ball_skills) %>%
-  left_join(player_tackling_skills) %>%
+  left_join(player_ball_skills %>%
+              dplyr::select(-position)) %>%
+  left_join(player_tackling_skills %>%
+              dplyr::select(-position))
+
+skills_table[is.na(skills_table)] = 0
+ 
+skills_table = skills_table %>% 
   mutate(eps_man_coverage = eps_tracking_w_penalties + eps_saved_closing_w_penalties +
            eps_saved_ball_skills_w_penalties + eps_tackling,
+         eps_man_coverage_no_penalties = eps_tracking + eps_saved_closing + 
+           eps_saved_ball_skills + eps_tackling,
+         eps_man_coverage_no_tackling = eps_man_coverage - eps_tackling,
          eps_per_man_route = eps_man_coverage/routes,
          tracking_penalties = penalities_count,
          closing_penalties = closing_penalties,
@@ -85,7 +94,7 @@ skills_table = player_tracking_skills %>%
                 "routes", "targets",
                 "completions", "PB", "interceptions","Tackles", "FF", 
                 "tracking_penalties","closing_penalties","ball_skills_penalties","eps_tracking_w_penalties","eps_saved_closing_w_penalties",
-         "eps_saved_ball_skills_w_penalties","eps_tackling") %>%
+         "eps_saved_ball_skills_w_penalties","eps_tackling","eps_man_coverage_no_penalties", "eps_man_coverage_no_tackling") %>%
   rename(INT = interceptions,
          T = Tackles,
          completions_allowed = completions,

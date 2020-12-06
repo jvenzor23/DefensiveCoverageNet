@@ -26,9 +26,9 @@ games = read.csv("~/Desktop/CoverageNet/inputs/games.csv")
 plays = read.csv("~/Desktop/CoverageNet/inputs/plays.csv")
 targeted_receiver = read.csv("~/Desktop/CoverageNet/inputs/targetedReceiver.csv")
 
-pbp_data = read.csv("~/Desktop/CoverageNet/src/00_data_wrangle/outputs/week17.csv")
+pbp_data = read.csv("~/Desktop/CoverageNet/src/00_data_wrangle/outputs/week3.csv")
 
-epa_tracking_total = read.csv("~/Desktop/CoverageNet/src/03_coverageNet/03_score_tracking/outputs/routes_tracking_epa3.csv")
+epa_tracking_total = read.csv("~/Desktop/CoverageNet/src/03_coverageNet/03_score_tracking/outputs/routes_tracking_epa.csv")
 
 pass_attempt_epa_data = read.csv("~/Desktop/CoverageNet/src/03_coverageNet/02_score_attempt/outputs/pass_attempt_epa_data.csv")
 pass_arrived_epa_data = read.csv("~/Desktop/CoverageNet/src/03_coverageNet/01_score_arrived/outputs/pass_arrived_epa_data.csv")
@@ -60,9 +60,9 @@ epa_tracking_total %>%
 example.play = pbp_data %>%
   inner_join(
     pbp_data %>%
-      select(gameId, playId) %>%
-      filter(gameId == 2018123000,
-            playId == 4376) %>%
+      dplyr::select(gameId, playId) %>%
+      filter(gameId == 2018092309,
+            playId == 138) %>%
       distinct()
       # sample_n(1)
   )
@@ -79,9 +79,9 @@ example.epa_tracking_point_plot_min_vals = example.epa_tracking_point_plot %>%
                distinct(gameId, playId, frameId) %>%
                rename(frameId2 = frameId)) %>%
   filter(frameId2 < frameId) %>%
-  select(-frameId) %>%
+  dplyr::select(-frameId) %>%
   rename(frameId = frameId2) %>%
-  select(names(example.epa_tracking_point_plot))
+  dplyr::select(names(example.epa_tracking_point_plot))
 
 example.epa_tracking_point_plot_max_vals = example.epa_tracking_point_plot %>%
   group_by(gameId, playId, targetNflId) %>%
@@ -90,9 +90,9 @@ example.epa_tracking_point_plot_max_vals = example.epa_tracking_point_plot %>%
                distinct(gameId, playId, frameId) %>%
                rename(frameId2 = frameId)) %>%
   filter(frameId2 > frameId) %>%
-  select(-frameId) %>%
+  dplyr::select(-frameId) %>%
   rename(frameId = frameId2) %>%
-  select(names(example.epa_tracking_point_plot)) 
+  dplyr::select(names(example.epa_tracking_point_plot)) 
 
 example.epa_tracking_point_plot = rbind.data.frame(example.epa_tracking_point_plot,
                                         example.epa_tracking_point_plot_min_vals,
@@ -109,9 +109,9 @@ example.epa_tracking_point_plot = example.epa_tracking_point_plot %>%
 example.epa_tracking_line_plot = example.epa_tracking_point_plot %>%
   rename(frameId_new = frameId) %>%
   full_join(example.epa_tracking_point_plot %>%
-              select(gameId, playId, targetNflId, frameId)) %>%
+              dplyr::select(gameId, playId, targetNflId, frameId)) %>%
   filter(frameId_new <= frameId) %>%
-  select(gameId, playId, frameId, targetNflId, time_after_snap, everything()) %>%
+  dplyr::select(gameId, playId, frameId, targetNflId, time_after_snap, everything()) %>%
   arrange(gameId, playId, frameId, targetNflId) %>%
   ungroup() %>%
   rowwise() %>%
@@ -119,14 +119,14 @@ example.epa_tracking_line_plot = example.epa_tracking_point_plot %>%
 
 example.play.info = plays %>%
   inner_join(example.play %>%
-               select(gameId, playId) %>%
+               dplyr::select(gameId, playId) %>%
                distinct()) %>%
   inner_join(targeted_receiver) %>%
   left_join(pass_attempt_epa_data %>%
-              select(-ends_with("_prob"))) %>%
+              dplyr::select(-ends_with("_prob"))) %>%
   left_join(pass_arrived_epa_data) %>%
   left_join(pass_caught_epa_data %>%
-              select(-epa))
+              dplyr::select(-epa))
 
 ## General field boundaries
 xmin <- 0
@@ -197,7 +197,7 @@ animate.epas =
   scale_fill_manual(values = c("grey", "red"), guide = FALSE) + 
   scale_colour_manual(values = c("grey", "red"), guide = FALSE) + 
   scale_alpha_manual(values = c(.5, 1), guide = FALSE) + 
-  geom_line(data = example.epa_tracking_line_plot %>% select(-frameId_new), aes(x = time_after_snap, y =  epa_pass_attempt,
+  geom_line(data = example.epa_tracking_line_plot %>% dplyr::select(-frameId_new), aes(x = time_after_snap, y =  epa_pass_attempt,
                                                                                 group = targetNflId, colour = targeted, alpha = targeted)) + 
   geom_point(data = example.epa_tracking_point_plot, aes(x = time_after_snap, y =  epa_pass_attempt,
                                       fill = targeted, group = targetNflId, size = targeted, colour = targeted)) + 

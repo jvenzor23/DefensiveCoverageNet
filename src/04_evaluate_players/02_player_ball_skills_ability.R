@@ -46,7 +46,11 @@ games = read.csv("~/Desktop/CoverageNet/inputs/games.csv")
 plays = read.csv("~/Desktop/CoverageNet/inputs/plays.csv", stringsAsFactors = FALSE)
 targeted_receiver = read.csv("~/Desktop/CoverageNet/inputs/targetedReceiver.csv")
 
-wr_db_man_matchups = read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/man_defense_off_coverage_assignments.csv")
+wr_db_man_matchups = read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/man_defense_off_coverage_assignments2.csv")
+# dropping WRs with double teams
+wr_db_man_matchups = wr_db_man_matchups %>%
+  group_by(gameId, playId, nflId_off) %>%
+  filter(n() == 1)
 
 pass_arrived_epa = read.csv("~/Desktop/CoverageNet/src/03_coverageNet/01_score_arrived/outputs/pass_arrived_epa_data.csv") %>%
   dplyr::select(gameId, playId, C_prob, IN_prob, epa_pass_arrived) %>%
