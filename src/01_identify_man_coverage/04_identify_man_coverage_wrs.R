@@ -39,9 +39,9 @@ man_zone_classification = rbind(
 
 # Filtering to Players In Man Coverage ------------------------------------
 
-# we require at least a 90% man probability to consider a player in man coverage
+# we require over a 50% man probability to consider a player in man coverage
 man_coverage = man_zone_classification %>%
-  filter(zone_probability <= .1)
+  filter(zone_probability < .5)
 
 
 # Deriving Attributes to Determine DB-WR pairs ----------------------------

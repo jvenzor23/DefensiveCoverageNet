@@ -52,7 +52,7 @@ closest_zone_player_pairs_total = data.frame()
 for(file in files){
   
   
-  pbp_data = read.csv(paste0("~/Desktop/CoverageNet/src/00_data_wrangle/outputs/",
+  pt_data = read.csv(paste0("~/Desktop/CoverageNet/src/00_data_wrangle/outputs/",
                              file))
 
   pt_data2 = pt_data %>%
@@ -96,10 +96,10 @@ for(file in files){
     arrange(gameId, playId, nflId, frameId_start) %>%
     dplyr::select(-comboId)
   
-  matchups_final_write = rbind.data.frame(closest_zone_player_pairs_total,
+  closest_zone_player_pairs_total = rbind.data.frame(closest_zone_player_pairs_total,
                                           closest_zone_player_pairs)
   
-  write.csv(matchups_final_write,
+  write.csv(closest_zone_player_pairs_total,
             "~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/zone_defense_off_coverage_assignments.csv",
             row.names = FALSE)
   

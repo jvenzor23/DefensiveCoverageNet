@@ -35,17 +35,17 @@ coverages_week1 = read.csv("~/Desktop/CoverageNet/inputs/coverages_week1.csv")
 pbp_data = read.csv("~/Desktop/CoverageNet/src/00_data_wrangle/outputs/week1.csv")
 
 man_assignments = read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/man_defense_off_coverage_assignments2.csv")
+zone_assignments = read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/zone_defense_off_coverage_assignments.csv")
 
 pbp_data = pbp_data %>%
   inner_join(man_assignments %>%
                distinct(gameId, playId))
 
-man_zone_classification = read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/corners_pass_attempts_man_zone_classes.csv")
-
 
 
 # Making the line segments df ---------------------------------------------
-man_assignments_segment_plt =  man_assignments %>%
+man_assignments_segment_plt =  rbind(
+  man_assignments %>%
   inner_join(pbp_data %>%
                dplyr::select(gameId, playId, nflId, frameId, x, y) %>%
                rename(nflId_off = nflId,
@@ -55,7 +55,26 @@ man_assignments_segment_plt =  man_assignments %>%
                dplyr::select(gameId, playId, nflId, frameId, x, y) %>%
                rename(nflId_def = nflId,
                       x_def = x,
-                      y_def = y))
+                      y_def = y)) %>%
+    mutate(coverage_type = "man"),
+  pbp_data %>%
+    inner_join(zone_assignments) %>%
+    filter(frameId >= frameId_start,
+           frameId <= frameId_end) %>%
+    dplyr::select(gameId, playId, nflId, nflId_opp, frameId, x, y) %>%
+    rename(nflId_def = nflId,
+           x_def = x,
+           y_def = y) %>%
+    inner_join(pbp_data,
+               by = c("gameId", "playId", "frameId", "nflId_opp" = "nflId")) %>%
+    rename(nflId_off = nflId_opp,
+           x_off = x,
+           y_off = y) %>%
+    dplyr::select(gameId, playId, nflId_def, nflId_off, frameId, 
+                  ends_with("def"), ends_with("off")) %>%
+    mutate(coverage_type = "zone")
+) %>%
+  arrange(gameId, playId, frameId, nflId_def)
 
 # Animating a Play --------------------------------------------------------
 
@@ -134,8 +153,8 @@ example.play = pbp_data %>%
   inner_join(
     pbp_data %>%
       dplyr::select(gameId, playId) %>%
-      # filter(gameId == 2018091001,
-      #       playId == 4123) %>%
+      # filter(gameId == 2018090910,
+      #       playId == 477) %>%
       # distinct()
       sample_n(1)
   )
@@ -147,6 +166,7 @@ example_man_assignments_segment_plt = man_assignments_segment_plt %>%
 example_zones = example.play %>%
   filter(position %in% c('FS','SS','S','CB','DB')) %>%
   anti_join(man_assignments_segment_plt %>%
+              inner_join(man_assignments) %>%
               distinct(gameId, playId, nflId_def) %>%
               rename(nflId = nflId_def))
 
@@ -173,6 +193,7 @@ df.hash <- df.hash %>% filter(y < ymax, y > ymin)
 
 animate.play = 
   ggplot() +
+  scale_linetype_manual(values = c("solid", "dashed")) + 
   scale_size_manual(values = c(6, 4, 6), guide = FALSE) + 
   scale_shape_manual(values = c(21, 16, 21), guide = FALSE) +
   scale_fill_manual(values = c("#e31837", "#654321", "#002244"), guide = FALSE) + 
@@ -200,7 +221,8 @@ animate.play =
                                       fill = team, group = nflId, size = team, colour = team), alpha = 0.7) + 
   geom_text(data = example.play, aes(x = (xmax-y), y = x + 10, label = jerseyNumber), colour = "white", 
             vjust = 0.36, size = 3.5) + 
-  geom_segment(aes(x = (xmax - y_off), y = x_off + 10, xend = (xmax - y_def), yend = x_def + 10, group = nflId_def), 
+  geom_segment(aes(x = (xmax - y_off), y = x_off + 10, xend = (xmax - y_def), yend = x_def + 10, group = nflId_def, 
+                   linetype = coverage_type), 
                 color = "black", data = example_man_assignments_segment_plt) + 
   ylim(ymin, ymax) + 
   coord_fixed() +  
