@@ -440,6 +440,56 @@ write.csv(player_probs_vs_time,
 
 # Analysis By Route -------------------------------------------------------
 
+library(broom)
+
+# Translating epa_per_route to eps_per_play -------------------------------
+
+route_epa_to_eps_per_play = epa_tracking_total_penalties_removed %>%
+  inner_join(routes) %>%
+  group_by(gameId, playId, route, targetNflId) %>%
+  summarize(max_epa = max(epa_pass_attempt)) %>%
+  inner_join(my_epa %>%
+               dplyr::select(-my_ep)) %>%
+  mutate(max_epa_disc = floor(max_epa*4)/4 + .125) %>%
+  group_by(route, max_epa_disc) %>%
+  summarize(count = n(),
+            avg_my_epa = mean(my_epa)) %>%
+  arrange(route, max_epa_disc) %>%
+  filter(count >= 10)
+
+route_epa_to_eps_per_play_model = do(route_epa_to_eps_per_play %>% 
+                                 group_by(route), 
+                               tidy(lm(avg_my_epa ~ max_epa_disc,
+                                          weights = count,
+                                          data = .))) %>%
+  dplyr::select(route, term, estimate) %>%
+  pivot_wider(names_from = term,
+              values_from = estimate)
+
+route_epa_to_eps_per_play = do(route_epa_to_eps_per_play %>% 
+                                                   group_by(route), 
+                                                 augment(lm(avg_my_epa ~ max_epa_disc,
+                                                            weights = count,
+                                                            data = .))) %>%
+  dplyr::select(route, max_epa_disc, avg_my_epa, .fitted) %>%
+  rename(fitted_avg_my_epa = .fitted)
+
+
+route_epa_to_eps_per_play %>%
+  ggplot() +
+  geom_point(aes(x = max_epa_disc, y = avg_my_epa)) +
+  geom_line(aes(x =max_epa_disc, y = fitted_avg_my_epa), color = "blue") +
+  facet_wrap(~route, scales = "free")
+
+route_avg_epa_per_passing_play = epa_tracking_total_penalties_removed %>%
+                                inner_join(routes) %>%
+                                inner_join(my_epa %>%
+                                      dplyr::select(-my_ep)) %>%
+                                distinct(gameId, playId, route, my_epa) %>%
+                                group_by(route) %>%
+                                summarize(avg_epa = mean(my_epa))
+
+
 # Looking at Max EPA over Each Interval Per Play --------------------------
 
 route_max_man_coverage_tracking = epa_tracking_total_penalties_removed %>%
@@ -509,17 +559,24 @@ route_fitted_max_man_coverage_tracking2 = route_fitted_max_man_coverage_tracking
   mutate(time_after_snap = as.factor(time_after_snap)) %>%
   inner_join(route_fit_by_player2 %>%
                mutate(time_after_snap = as.factor(time_after_snap))) %>%
+  inner_join(route_epa_to_eps_per_play_model) %>%
+  mutate(eps_tracking_avg = `(Intercept)` + max_epa_disc*avg_max_epa_pred) %>%
+  inner_join(route_avg_epa_per_passing_play) %>%
+  mutate(eps_tracking_per_play = avg_epa - eps_tracking_avg)
+
+route_fitted_max_man_coverage_tracking2 = route_fitted_max_man_coverage_tracking2 %>%
   inner_join(full_probs_df %>%
                mutate(time_after_snap = as.factor(time_after_snap))) %>%
   group_by(nflId_def, route) %>%
   mutate(prob_norm = prob/sum(prob)) %>%
   group_by(nflId_def, route) %>%
   summarize(routes = max(count),
+            eps_tracking_per_play = sum(eps_tracking_per_play*prob_norm),
             normalized_avg_max_epa = sum(avg_max_epa_pred*prob_norm)) %>%
   inner_join(players %>%
-               dplyr::select(nflId, displayName),
+               dplyr::select(position, nflId, displayName),
              by = c("nflId_def" = "nflId")) %>%
-  dplyr::select(displayName, nflId_def, route, routes, normalized_avg_max_epa) %>%
+  dplyr::select(position, displayName, nflId_def, route, routes, eps_tracking_per_play, normalized_avg_max_epa) %>%
   left_join(wr_db_man_matchups %>%
               group_by(nflId_def) %>%
               summarize(count = n()) %>%
@@ -528,147 +585,11 @@ route_fitted_max_man_coverage_tracking2 = route_fitted_max_man_coverage_tracking
               mutate(qualifying = 1)) %>%
   mutate(qualifying = replace_na(qualifying, 0)) %>%
   dplyr::select(qualifying, everything()) %>%
-  arrange(desc(qualifying), displayName, routes, desc(normalized_avg_max_epa))
-  
-
-# Getting the Overall Average ---------------------------------------------
-
-route_all_max_man_coverage_tracking = epa_tracking_total_penalties_removed %>%
-  inner_join(routes,
-             by = c("gameId", "playId", "targetNflId" = "nflId")) %>%
-  inner_join(wr_db_man_matchups,
-             by = c("gameId", "playId", "targetNflId" = "nflId_off")) %>%
-  group_by(gameId, playId, targetNflId) %>%
-  mutate(time_after_snap = (5 + (frameId - min(frameId)))*.1) %>%
-  ungroup() %>%
-  group_by(gameId, playId, nflId_def) %>%
-  mutate(epa_pass_attempt_max = cummax(epa_pass_attempt)) %>%
-  ungroup() %>%
-  group_by(time_after_snap, route) %>%
-  summarise(count = n(),
-            avg_max_epa = mean(epa_pass_attempt_max)) %>%
-  arrange(route, time_after_snap) %>%
-  group_by(route) %>%
-  mutate(max_time_after_snap = max(time_after_snap)) %>%
-  ungroup()
-
-# Fitting a Monotonic Function to Each Player -----------------------------
-
-route_all_fitted_max_man_coverage_tracking = route_all_max_man_coverage_tracking %>%
-  ungroup() %>%
-  filter(time_after_snap <= min(max_time_after_snap))
+  arrange(desc(qualifying), displayName, desc(eps_tracking_per_play))
 
 
-# Break up d by state, then fit the specified model to each piece and
-# return a list
-models <- plyr::dlply(route_all_fitted_max_man_coverage_tracking, "route"
-                      , function(df) 
-                        scam(avg_max_epa ~ s(time_after_snap, k = 5, bs = "mpi"), 
-                             weights = count,
-                             data = df))
-# Apply coef to each model and return a data frame
-route_all_fit_by_player = plyr::ldply(models, stats::fitted.values)
-
-route_all_fit_by_player2 = route_all_fit_by_player %>%
-  pivot_longer(cols = setdiff(names(route_all_fit_by_player), "route"),
-               names_to = "time_after_snap_placeholder",
-               values_to = "avg_max_epa_pred") %>%
-  group_by(route) %>%
-  mutate(time_after_snap = row_number()*.1 + .4) %>%
-  dplyr::select(-time_after_snap_placeholder)
-
-route_all_fitted_max_man_coverage_tracking2 = route_all_fitted_max_man_coverage_tracking %>%
-  mutate(time_after_snap = as.factor(time_after_snap)) %>%
-  inner_join(route_all_fit_by_player2 %>%
-               mutate(time_after_snap = as.factor(time_after_snap))) %>%
-  inner_join(full_probs_df %>%
-               mutate(time_after_snap = as.factor(time_after_snap))) %>%
-  group_by(route) %>%
-  mutate(prob_norm = prob/sum(prob)) %>%
-  summarize(routes = max(count),
-            route_normalized_avg_max_epa = sum(avg_max_epa_pred*prob_norm)) %>%
-  dplyr::select(route, routes, route_normalized_avg_max_epa) %>%
-  arrange(desc(route_normalized_avg_max_epa))
-
-
-# Finalizing Tracking Ability ---------------------------------------------
-
-route_fitted_max_man_coverage_tracking3 = route_fitted_max_man_coverage_tracking2 %>%
-  inner_join(route_all_fitted_max_man_coverage_tracking2 %>%
-               dplyr::select(-routes)) %>%
-  mutate(eps_per_route =  route_normalized_avg_max_epa - normalized_avg_max_epa) %>%
-  inner_join(players %>%
-               dplyr::select(displayName, position)) %>%
-  dplyr::select(position, displayName, nflId_def, route, routes, eps_per_route, normalized_avg_max_epa,
-                route_normalized_avg_max_epa) %>%
-  left_join(wr_db_man_matchups %>%
-              group_by(nflId_def) %>%
-              summarize(count = n()) %>%
-              filter(count >= 100) %>%
-              distinct(nflId_def) %>%
-              mutate(qualifying = 1)) %>%
-  mutate(qualifying = replace_na(qualifying, 0)) %>%
-  dplyr::select(qualifying, everything()) %>%
-  arrange(desc(qualifying), displayName, desc(eps_per_route)) %>%
-  filter(route != "undefined")
-
-
-route_fitted_max_man_coverage_tracking4 = route_fitted_max_man_coverage_tracking3 %>%
-  group_by(qualifying, position, displayName, nflId_def) %>%
-  summarize(qualifying_routes = sum(routes),
-            distinct_routes = length(unique(route)),
-            route_normalized_eps_per_route = sum(routes*eps_per_route)/sum(routes)) %>%
-  arrange(desc(qualifying), desc(route_normalized_eps_per_route))
-
-route_fitted_max_man_coverage_tracking_depth = route_fitted_max_man_coverage_tracking3 %>%
-  mutate(route = case_when(route %in% c('CORNER', 'POST', 'GO', 'WHEEL') ~ "DEEP",
-                                 route %in% c('IN', 'OUT', 'HITCH') ~ "INTERMEDIATE",
-                                 route %in% c('SCREEN', 'FLAT', 'CROSS','SLANT','ANGLE') ~ "SHORT",
-                                 TRUE ~ "UNDEFINED")) %>%
-  group_by(qualifying, position, displayName, nflId_def, route) %>%
-  summarize(route_normalized_avg_max_epa = sum(routes*route_normalized_avg_max_epa)/sum(routes),
-            normalized_avg_max_epa = sum(routes*normalized_avg_max_epa)/sum(routes),
-            eps_per_route = route_normalized_avg_max_epa - normalized_avg_max_epa,
-            routes = sum(routes)) %>%
-  dplyr::select(names(route_fitted_max_man_coverage_tracking3)) %>%
-  arrange(desc(qualifying), displayName, desc(eps_per_route)) %>%
-  filter(route != "UNDEFINED")
-
-route_fitted_max_man_coverage_tracking_change_of_direction = route_fitted_max_man_coverage_tracking3 %>%
-  mutate(route = case_when(route %in% c('SLANT', 'IN', 'OUT', 'HITCH') ~ "SHARP",
-                           route %in% c('POST', 'CORNER', 'ANGLE', 'WHEEL') ~ "INTERMEDIATE",
-                           route %in% c('CROSS', 'FLAT', 'GO', 'SCREEN') ~ "MINIMAL",
-                           TRUE ~ "UNDEFINED")) %>%
-  group_by(qualifying, position, displayName, nflId_def, route) %>%
-  summarize(route_normalized_avg_max_epa = sum(routes*route_normalized_avg_max_epa)/sum(routes),
-            normalized_avg_max_epa = sum(routes*normalized_avg_max_epa)/sum(routes),
-            eps_per_route = route_normalized_avg_max_epa - normalized_avg_max_epa,
-            routes = sum(routes)) %>%
-  dplyr::select(names(route_fitted_max_man_coverage_tracking3)) %>%
-  arrange(desc(qualifying), displayName, desc(eps_per_route)) %>%
-  filter(route != "UNDEFINED")
-
-route_fitted_max_man_coverage_tracking3 = rbind(
-  route_fitted_max_man_coverage_tracking3 %>%
-    mutate(route_disc = "route_type"),
-  route_fitted_max_man_coverage_tracking_depth %>%
-    mutate(route_disc = "route_depth"),
-  route_fitted_max_man_coverage_tracking_change_of_direction %>%
-    mutate(route_disc = "route_change_of_direction")
-) %>%
-  dplyr::select(qualifying, position, displayName, nflId_def, route_disc, 
-                route, routes, eps_per_route, normalized_avg_max_epa,
-                route_normalized_avg_max_epa) %>%
-  arrange(desc(qualifying), displayName, route_disc, desc(eps_per_route))
-  
-
-
-write.csv(route_fitted_max_man_coverage_tracking3,
+write.csv(route_fitted_max_man_coverage_tracking2,
           "~/Desktop/CoverageNet/src/04_evaluate_players/outputs/player_tracking_eps_by_route.csv",
-          row.names = FALSE)
-
-write.csv(route_fitted_max_man_coverage_tracking4,
-          "~/Desktop/CoverageNet/src/04_evaluate_players/outputs/route_normalized_player_tracking_eps_by_route.csv",
           row.names = FALSE)
 
 

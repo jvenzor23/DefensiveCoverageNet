@@ -38,9 +38,9 @@ man_zone_classification = rbind(
 
 # Filtering to Players In Man Coverage ------------------------------------
 
-# we require at least a 90% man probability to consider a player in man coverage
+# we require at least a 50% zone probability to consider a player in zone coverage
 zone_coverage = man_zone_classification %>%
-  filter(zone_probability >= .9)
+  filter(zone_probability >= .5)
 
 # Identifying Closest Player ----------------------------------------------
 

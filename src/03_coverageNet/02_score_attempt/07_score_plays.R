@@ -29,7 +29,7 @@ plays = read.csv("~/Desktop/CoverageNet/inputs/plays.csv",
 # 2018 NFL Full Play-By-Play Data
 setwd("~/Desktop/NFL_PBP_DATA/")
 pbp_data_2018 = read.csv("reg_pbp_2018.csv", stringsAsFactors = FALSE) %>%
-  select(game_id, play_id, posteam, play_type, game_half, qtr, half_seconds_remaining, ydstogo,
+  dplyr::select(game_id, play_id, posteam, play_type, game_half, qtr, half_seconds_remaining, ydstogo,
          down, yardline_100, yards_gained,
          touchdown, return_touchdown, safety, field_goal_result,
          goal_to_go, 
@@ -60,11 +60,11 @@ my_epa_data = read.csv("~/Desktop/CoverageNet/src/02_yards_to_epa_function/outpu
 
 # cor with BDB epa
 plays_with_my_epa = plays %>%
-  select(gameId, playId, playDescription, YardsFromOwnGoal,passResult, offensePlayResult,playResult, penaltyCodes,epa) %>%
+  dplyr::select(gameId, playId, playDescription, YardsFromOwnGoal,passResult, offensePlayResult,playResult, penaltyCodes,epa) %>%
   left_join(pbp_data_2018 %>%
               inner_join(my_epa_data) %>%
                ungroup() %>%
-               select(gameId, playId, air_yards, yards_after_catch, my_epa))
+               dplyr::select(gameId, playId, air_yards, yards_after_catch, my_epa))
 
 plays_with_my_epa_check = plays_with_my_epa %>%
   filter(!is.na(my_epa))
@@ -76,7 +76,7 @@ cor(plays_with_my_epa_check$epa, plays_with_my_epa_check$my_epa)
 pass_attempt_caught_plays = pass_attempt_caught_preds %>%
   inner_join(pbp_data_2018 %>%
                inner_join(my_epa_data) %>%
-               select(gameId, playId, TimeSecs_Remaining,
+               dplyr::select(gameId, playId, TimeSecs_Remaining,
                       down, ydstogo, yrdline100,
                       air_yards, my_ep))
 
@@ -86,7 +86,7 @@ pass_attempt_caught_plays2 = pass_attempt_caught_plays %>%
   mutate(yardline_end = case_when(yardline_end > 100 ~ 100,
                                   yardline_end < 0 ~ 0,
                                   TRUE ~ as.numeric(yardline_end))) %>%
-  select(-offensePlayResult) %>%
+  dplyr::select(-offensePlayResult) %>%
   group_by_at(vars(-probability)) %>%
   summarize(probability = sum(probability))
 
@@ -106,10 +106,10 @@ pass_attempt_caught_plays3 = pass_attempt_caught_plays2 %>%
   inner_join(pbp_data_2018 %>%
                group_by(gameId, game_half) %>%
                mutate(TimeSecs_Remaining_new = lead(TimeSecs_Remaining)) %>%
-               select(gameId, playId, TimeSecs_Remaining_new)
+               dplyr::select(gameId, playId, TimeSecs_Remaining_new)
                ) %>%
   mutate(TimeSecs_Remaining_new = replace_na(TimeSecs_Remaining_new, 0)) %>%
-  select(gameId, playId, turnover_on_downs, offensePlayResult,
+  dplyr::select(gameId, playId, turnover_on_downs, offensePlayResult,
          ends_with("_new"), my_ep, probability)
 
 colnames(pass_attempt_caught_plays3) = gsub("_new", "", names(pass_attempt_caught_plays3))
@@ -159,12 +159,12 @@ rm(pass_attempt_caught_plays3,
 # Compute EPA_throw For All Incompletions Using NNET Model ----------------
 
 pass_attempt_incomplete_plays = pass_attempt_class_preds %>%
-  select(gameId, playId) %>%
+  dplyr::select(gameId, playId) %>%
   mutate(offensePlayResult = 0,
          probability = 1) %>%
   inner_join(pbp_data_2018 %>%
                inner_join(my_epa_data) %>%
-               select(gameId, playId, TimeSecs_Remaining,
+               dplyr::select(gameId, playId, TimeSecs_Remaining,
                       down, ydstogo, yrdline100,
                       air_yards, my_ep))
 
@@ -174,7 +174,7 @@ pass_attempt_incomplete_plays2 = pass_attempt_incomplete_plays %>%
   mutate(yardline_end = case_when(yardline_end > 100 ~ 100,
                                   yardline_end < 0 ~ 0,
                                   TRUE ~ as.numeric(yardline_end))) %>%
-  select(-offensePlayResult) %>%
+  dplyr::select(-offensePlayResult) %>%
   group_by_at(vars(-probability)) %>%
   summarize(probability = sum(probability))
 
@@ -194,10 +194,10 @@ pass_attempt_incomplete_plays3 = pass_attempt_incomplete_plays2 %>%
   inner_join(pbp_data_2018 %>%
                group_by(gameId, game_half) %>%
                mutate(TimeSecs_Remaining_new = lead(TimeSecs_Remaining)) %>%
-               select(gameId, playId, TimeSecs_Remaining_new)
+               dplyr::select(gameId, playId, TimeSecs_Remaining_new)
   ) %>%
   mutate(TimeSecs_Remaining_new = replace_na(TimeSecs_Remaining_new, 0)) %>%
-  select(gameId, playId, turnover_on_downs, offensePlayResult,
+  dplyr::select(gameId, playId, turnover_on_downs, offensePlayResult,
          ends_with("_new"), my_ep, probability)
 
 colnames(pass_attempt_incomplete_plays3) = gsub("_new", "", names(pass_attempt_incomplete_plays3))
@@ -246,7 +246,7 @@ rm(pass_attempt_incomplete_plays3,
 pass_attempt_intercepted_plays = pass_attempt_intercepted_preds %>%
   inner_join(pbp_data_2018 %>%
                inner_join(my_epa_data) %>%
-               select(gameId, playId, TimeSecs_Remaining,
+               dplyr::select(gameId, playId, TimeSecs_Remaining,
                       down, ydstogo, yrdline100,
                       air_yards, my_ep))
 
@@ -256,7 +256,7 @@ pass_attempt_intercepted_plays2 = pass_attempt_intercepted_plays %>%
   mutate(yardline_end = case_when(yardline_end > 100 ~ 100,
                                   yardline_end < 0 ~ 0,
                                   TRUE ~ as.numeric(yardline_end))) %>%
-  select(-offensePlayResult) %>%
+  dplyr::select(-offensePlayResult) %>%
   group_by_at(vars(-probability)) %>%
   summarize(probability = sum(probability))
 
@@ -273,10 +273,10 @@ pass_attempt_intercepted_plays3 = pass_attempt_intercepted_plays2 %>%
   inner_join(pbp_data_2018 %>%
                group_by(gameId, game_half) %>%
                mutate(TimeSecs_Remaining_new = lead(TimeSecs_Remaining)) %>%
-               select(gameId, playId, TimeSecs_Remaining_new)
+               dplyr::select(gameId, playId, TimeSecs_Remaining_new)
   ) %>%
   mutate(TimeSecs_Remaining_new = replace_na(TimeSecs_Remaining_new, 0)) %>%
-  select(gameId, playId, turnover, offensePlayResult,
+  dplyr::select(gameId, playId, turnover, offensePlayResult,
          ends_with("_new"), my_ep, probability)
 
 colnames(pass_attempt_intercepted_plays3) = gsub("_new", "", names(pass_attempt_intercepted_plays3))
@@ -326,6 +326,6 @@ plays_with_my_epa5 = plays_with_my_epa4 %>%
 
 plays_with_my_epa6 = plays_with_my_epa5 %>%
   filter(!is.na(epa_pass_attempt)) %>%
-  select(gameId, playId, C_prob, I_prob, IN_prob, epa_pass_attempt)
+  dplyr::select(gameId, playId, C_prob, I_prob, IN_prob, epa_pass_attempt)
 
 write.csv(plays_with_my_epa6, "~/Desktop/CoverageNet/src/03_coverageNet/02_score_attempt/outputs/pass_attempt_epa_data.csv", row.names = FALSE)

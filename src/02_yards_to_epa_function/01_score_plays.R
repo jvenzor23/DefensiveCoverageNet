@@ -31,7 +31,7 @@ plays = read.csv("~/Desktop/CoverageNet/inputs/plays.csv",
 # 2018 NFL Full Play-By-Play Data
 setwd("~/Desktop/NFL_PBP_DATA/")
 pbp_data_2018 = read.csv("reg_pbp_2018.csv", stringsAsFactors = FALSE) %>%
-  select(game_id, play_id, posteam, play_type, game_half, qtr, half_seconds_remaining, ydstogo,
+  dplyr::select(game_id, play_id, posteam, play_type, game_half, qtr, half_seconds_remaining, ydstogo,
          down, yardline_100, yards_gained,
          touchdown, return_touchdown, safety, field_goal_result,
          goal_to_go, 
@@ -116,10 +116,10 @@ cor((pbp_data_2018_model_data2 %>%
 
 # cor with BDB epa
 plays_with_my_epa = plays %>%
-  select(gameId, playId, playDescription, YardsFromOwnGoal,passResult, offensePlayResult,playResult, penaltyCodes, epa) %>%
+  dplyr::select(gameId, playId, playDescription, YardsFromOwnGoal,passResult, offensePlayResult,playResult, penaltyCodes, epa) %>%
   left_join(pbp_data_2018_model_data2 %>%
                ungroup() %>%
-               select(gameId, playId, air_yards, yards_after_catch, my_ep, my_epa))
+               dplyr::select(gameId, playId, air_yards, yards_after_catch, my_ep, my_epa))
 
 plays_with_my_epa_check = plays_with_my_epa %>%
   filter(!is.na(my_epa))
@@ -133,9 +133,11 @@ plays_missed = plays %>%
 
 # saving plays with my epa ------------------------------------------------
 plays_epa_write = plays_with_my_epa %>%
-  select(gameId, playId, my_ep, my_epa)
+  dplyr::select(gameId, playId, my_ep, my_epa)
 
 write.csv(plays_epa_write,
           "~/Desktop/CoverageNet/src/02_yards_to_epa_function/outputs/plays_with_epa.csv",
           row.names = FALSE)
+
+check = read.csv("~/Desktop/CoverageNet/src/02_yards_to_epa_function/outputs/plays_with_epa.csv")
 
