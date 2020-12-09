@@ -87,7 +87,8 @@ for(file in files){
     arrange(gameId, playId, nflId, frameId) %>%
     group_by(gameId, playId) %>%
     mutate(comboId = cumsum(replace_na(lag(nflId) != nflId, FALSE)|
-                            replace_na(lag(nflId_opp) != nflId_opp, FALSE))) %>%
+                            replace_na(lag(nflId_opp) != nflId_opp, FALSE)|
+                            replace_na(lag(frameId) != (frameId - 1), FALSE))) %>%
     group_by(gameId, playId, comboId) %>%
     summarize(nflId = nflId[1],
               nflId_opp = nflId_opp[1],
