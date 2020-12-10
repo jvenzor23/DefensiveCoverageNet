@@ -101,7 +101,7 @@ for(file in files){
                                           closest_zone_player_pairs)
   
   write.csv(closest_zone_player_pairs_total,
-            "~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/zone_defense_off_coverage_assignments.csv",
+            "~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/zone_defense_off_coverage_assignments_all.csv",
             row.names = FALSE)
   
 }

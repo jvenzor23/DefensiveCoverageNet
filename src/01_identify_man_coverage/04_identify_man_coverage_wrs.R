@@ -24,14 +24,22 @@ games = read.csv("~/Desktop/CoverageNet/inputs/games.csv")
 plays = read.csv("~/Desktop/CoverageNet/inputs/plays.csv")
 targeted_receiver = read.csv("~/Desktop/CoverageNet/inputs/targetedReceiver.csv")
 
+# man_zone_classification = rbind(
+#   read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/corners_pass_attempts_man_zone_classes.csv") %>%
+#     dplyr::select(gameId, playId, nflId, zone_probability),
+#   read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/corners_sacks_man_zone_classes.csv") %>%
+#     dplyr::select(gameId, playId, nflId, zone_probability),
+#   read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/safeties_pass_attempts_man_zone_classes.csv") %>%
+#     dplyr::select(gameId, playId, nflId, zone_probability),
+#   read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/safeties_sacks_man_zone_classes.csv") %>%
+#     dplyr::select(gameId, playId, nflId, zone_probability)
+# ) %>%
+#   arrange(gameId, playId, nflId)
+
 man_zone_classification = rbind(
-  read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/corners_pass_attempts_man_zone_classes.csv") %>%
+  read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/all_positions_pass_attempts_man_zone_classes.csv") %>%
     dplyr::select(gameId, playId, nflId, zone_probability),
-  read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/corners_sacks_man_zone_classes.csv") %>%
-    dplyr::select(gameId, playId, nflId, zone_probability),
-  read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/safeties_pass_attempts_man_zone_classes.csv") %>%
-    dplyr::select(gameId, playId, nflId, zone_probability),
-  read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/safeties_sacks_man_zone_classes.csv") %>%
+  read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/all_positions_sacks_man_zone_classes.csv") %>%
     dplyr::select(gameId, playId, nflId, zone_probability)
 ) %>%
   arrange(gameId, playId, nflId)
@@ -197,7 +205,7 @@ for(file in files){
                                matchups_final)
   
   write.csv(matchups_final_write,
-            "~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/man_defense_off_coverage_assignments2.csv",
+            "~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/man_defense_off_coverage_assignments_all.csv",
             row.names = FALSE)
   
 }

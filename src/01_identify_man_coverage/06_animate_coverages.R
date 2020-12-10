@@ -34,8 +34,8 @@ coverages_week1 = read.csv("~/Desktop/CoverageNet/inputs/coverages_week1.csv")
 
 pbp_data = read.csv("~/Desktop/CoverageNet/src/00_data_wrangle/outputs/week1.csv")
 
-man_assignments = read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/man_defense_off_coverage_assignments2.csv")
-zone_assignments = read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/zone_defense_off_coverage_assignments.csv")
+man_assignments = read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/man_defense_off_coverage_assignments_all.csv")
+zone_assignments = read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/zone_defense_off_coverage_assignments_all.csv")
 
 pbp_data = pbp_data %>%
   inner_join(man_assignments %>%
@@ -153,10 +153,10 @@ example.play = pbp_data %>%
   inner_join(
     pbp_data %>%
       dplyr::select(gameId, playId) %>%
-      filter(gameId == 2018090600,
-            playId == 168) %>%
-      distinct()
-      # sample_n(1)
+      # filter(gameId == 2018090600,
+      #       playId == 168) %>%
+      # distinct()
+      sample_n(1)
   )
 
 example_man_assignments_segment_plt = man_assignments_segment_plt %>%

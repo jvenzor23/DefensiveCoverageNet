@@ -43,7 +43,7 @@ games = read.csv("~/Desktop/CoverageNet/inputs/games.csv")
 plays = read.csv("~/Desktop/CoverageNet/inputs/plays.csv", stringsAsFactors = FALSE)
 targeted_receiver = read.csv("~/Desktop/CoverageNet/inputs/targetedReceiver.csv")
 epa_tracking_total = read.csv("~/Desktop/CoverageNet/src/03_coverageNet/03_score_tracking/outputs/routes_tracking_epa.csv")
-wr_db_man_matchups = read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/man_defense_off_coverage_assignments2.csv")
+wr_db_man_matchups = read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/man_defense_off_coverage_assignments_all.csv")
 # dropping WRs with double teams
 wr_db_man_matchups = wr_db_man_matchups %>%
   group_by(gameId, playId, nflId_off) %>%
@@ -165,11 +165,11 @@ epa_to_eps_per_play = epa_tracking_total_penalties_removed %>%
   filter(count >= 100)
 
 fitted.values = scam(avg_my_epa ~ s(max_epa_disc, k = 5, bs = "mpi"),
-                     # weights = count,
+                     weights = count,
                      data = epa_to_eps_per_play)$fitted.values
 
 epa_to_eps_model = scam(avg_my_epa ~ s(max_epa_disc, k = 5, bs = "mpi"),
-                        # weights = count,
+                        weights = count,
                         data = epa_to_eps_per_play)
 
 epa_to_eps_per_play$fitted_avg_my_epa = fitted.values
@@ -534,6 +534,10 @@ route_fitted_max_man_coverage_tracking = route_max_man_coverage_tracking_filled 
                distinct(nflId_def, route) %>%
                ungroup() %>%
                mutate(group = row_number()))
+
+route_fitted_max_man_coverage_tracking = route_fitted_max_man_coverage_tracking %>%
+  group_by(route, nflId_def) %>%
+  filter(sd(avg_max_epa) != 0)
 
 # Break up d by state, then fit the specified model to each piece and
 # return a list
