@@ -34,11 +34,28 @@ coverages_week1 = read.csv("~/Desktop/CoverageNet/inputs/coverages_week1.csv")
 
 pbp_data = read.csv("~/Desktop/CoverageNet/src/00_data_wrangle/outputs/week1.csv")
 
-man_assignments = read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/man_defense_off_coverage_assignments_all.csv")
-zone_assignments = read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/zone_defense_off_coverage_assignments_all.csv")
+zone_coverage = rbind(
+  read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/all_positions_pass_attempts_man_zone_classes.csv") %>%
+    dplyr::select(gameId, playId, nflId, zone_probability),
+  read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/all_positions_sacks_man_zone_classes.csv") %>%
+    dplyr::select(gameId, playId, nflId, zone_probability),
+  read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/linebackers_pass_attempts_man_zone_classes.csv") %>%
+    dplyr::select(gameId, playId, nflId, zone_probability),
+  read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/linebackers_sacks_man_zone_classes.csv") %>%
+    dplyr::select(gameId, playId, nflId, zone_probability)
+) %>%
+  arrange(gameId, playId, nflId) %>%
+  filter(zone_probability >= .5)
+
+man_assignments = read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/man_defense_off_coverage_assignments_all_lbs.csv")
+zone_assignments = read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/zone_defense_off_coverage_assignments_all_lbs.csv")
 
 pbp_data = pbp_data %>%
-  inner_join(man_assignments %>%
+  inner_join(pbp_data %>%
+               filter(nflId == 2495281) %>%
+               distinct(gameId, playId)) %>%
+  inner_join(zone_coverage %>%
+               filter(nflId == 2495281) %>%
                distinct(gameId, playId))
 
 
@@ -154,7 +171,7 @@ example.play = pbp_data %>%
     pbp_data %>%
       dplyr::select(gameId, playId) %>%
       # filter(gameId == 2018090600,
-      #       playId == 168) %>%
+      #      playId == 168) %>%
       # distinct()
       sample_n(1)
   )
@@ -164,11 +181,9 @@ example_man_assignments_segment_plt = man_assignments_segment_plt %>%
                distinct(gameId, playId))
 
 example_zones = example.play %>%
-  filter(position %in% c('FS','SS','S','CB','DB')) %>%
-  anti_join(man_assignments_segment_plt %>%
+  inner_join(zone_coverage %>%
               inner_join(man_assignments) %>%
-              distinct(gameId, playId, nflId_def) %>%
-              rename(nflId = nflId_def))
+              distinct(gameId, playId, nflId))
 
 example.play.info = plays %>%
   inner_join(example.play %>%
@@ -247,4 +262,4 @@ animate.play =
 ## Ensure timing of play matches 10 frames-per-second
 play.length.ex <- length(unique(example.play$frameId))
 animate(animate.play, fps = 10, nframe = play.length.ex)
-
+ 

@@ -23,14 +23,26 @@ players = read.csv("~/Desktop/CoverageNet/inputs/players.csv")
 games = read.csv("~/Desktop/CoverageNet/inputs/games.csv")
 plays = read.csv("~/Desktop/CoverageNet/inputs/plays.csv")
 
+# man_zone_classification = rbind(
+#   read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/corners_pass_attempts_man_zone_classes.csv") %>%
+#     dplyr::select(gameId, playId, nflId, zone_probability),
+#   read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/corners_sacks_man_zone_classes.csv") %>%
+#     dplyr::select(gameId, playId, nflId, zone_probability),
+#   read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/safeties_pass_attempts_man_zone_classes.csv") %>%
+#     dplyr::select(gameId, playId, nflId, zone_probability),
+#   read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/safeties_sacks_man_zone_classes.csv") %>%
+#     dplyr::select(gameId, playId, nflId, zone_probability)
+# ) %>%
+#   arrange(gameId, playId, nflId)
+
 man_zone_classification = rbind(
-  read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/corners_pass_attempts_man_zone_classes.csv") %>%
+  read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/all_positions_pass_attempts_man_zone_classes.csv") %>%
     dplyr::select(gameId, playId, nflId, zone_probability),
-  read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/corners_sacks_man_zone_classes.csv") %>%
+  read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/all_positions_sacks_man_zone_classes.csv") %>%
     dplyr::select(gameId, playId, nflId, zone_probability),
-  read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/safeties_pass_attempts_man_zone_classes.csv") %>%
+  read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/linebackers_pass_attempts_man_zone_classes.csv") %>%
     dplyr::select(gameId, playId, nflId, zone_probability),
-  read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/safeties_sacks_man_zone_classes.csv") %>%
+  read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/linebackers_sacks_man_zone_classes.csv") %>%
     dplyr::select(gameId, playId, nflId, zone_probability)
 ) %>%
   arrange(gameId, playId, nflId)
@@ -101,7 +113,7 @@ for(file in files){
                                           closest_zone_player_pairs)
   
   write.csv(closest_zone_player_pairs_total,
-            "~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/zone_defense_off_coverage_assignments_all.csv",
+            "~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/zone_defense_off_coverage_assignments_all_lbs.csv",
             row.names = FALSE)
   
 }

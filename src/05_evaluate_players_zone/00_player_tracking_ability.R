@@ -43,8 +43,8 @@ games = read.csv("~/Desktop/CoverageNet/inputs/games.csv")
 plays = read.csv("~/Desktop/CoverageNet/inputs/plays.csv", stringsAsFactors = FALSE)
 targeted_receiver = read.csv("~/Desktop/CoverageNet/inputs/targetedReceiver.csv")
 epa_tracking_total = read.csv("~/Desktop/CoverageNet/src/03_coverageNet/03_score_tracking/outputs/routes_tracking_epa.csv")
-wr_db_man_matchups = read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/man_defense_off_coverage_assignments_all.csv")
-wr_db_zone_matchups_tot = read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/zone_defense_off_coverage_assignments_all.csv")
+wr_db_man_matchups = read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/man_defense_off_coverage_assignments_all_lbs.csv")
+wr_db_zone_matchups_tot = read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/zone_defense_off_coverage_assignments_all_lbs.csv")
 
 
 # setwd("~/Desktop/NFL_PBP_DATA/")
@@ -160,8 +160,8 @@ epa_tracking_total_penalties_removed = epa_tracking_total %>%
 
 epa_to_eps_per_play = epa_tracking_total_penalties_removed %>%
   group_by(gameId, playId, targetNflId, nflId, frameId_start) %>%
-  summarize(# max_epa = max(epa_pass_attempt)) %>%
-    max_epa = epa_pass_attempt[length(epa_pass_attempt)]) %>%
+  summarize(max_epa = max(epa_pass_attempt)) %>%
+    # max_epa = epa_pass_attempt[length(epa_pass_attempt)]) %>%
   # group_by(gameId, playId, targetNflId) %>%
   # filter(frameId_start == max(frameId_start)) %>%
   inner_join(my_epa %>%
@@ -171,7 +171,7 @@ epa_to_eps_per_play = epa_tracking_total_penalties_removed %>%
   summarize(count = n(),
             avg_my_epa = mean(my_epa)) %>%
   arrange(max_epa_disc) %>%
-  filter(count >= 500)
+  filter(count >= 100)
 
 fitted.values = scam(avg_my_epa ~ s(max_epa_disc, k = 5, bs = "mpi"),
                      # weights = count,
@@ -314,7 +314,7 @@ library(scam)
 # Break up d by state, then fit the specified model to each piece and
 # return a list
 models <- plyr::dlply(max_zone_coverage_tracking_filled, "nflId", function(df) 
-  scam(avg_max_epa ~ s(time_after_entering_zone, k = 8, bs = "mpi"), 
+  scam(avg_max_epa ~ s(time_after_entering_zone, k = 12, bs = "mpi"), 
        weights = count,
        data = df))
 

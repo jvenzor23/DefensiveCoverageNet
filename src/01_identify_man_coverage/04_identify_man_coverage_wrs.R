@@ -40,6 +40,10 @@ man_zone_classification = rbind(
   read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/all_positions_pass_attempts_man_zone_classes.csv") %>%
     dplyr::select(gameId, playId, nflId, zone_probability),
   read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/all_positions_sacks_man_zone_classes.csv") %>%
+    dplyr::select(gameId, playId, nflId, zone_probability),
+  read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/linebackers_pass_attempts_man_zone_classes.csv") %>%
+    dplyr::select(gameId, playId, nflId, zone_probability),
+  read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/linebackers_sacks_man_zone_classes.csv") %>%
     dplyr::select(gameId, playId, nflId, zone_probability)
 ) %>%
   arrange(gameId, playId, nflId)
@@ -205,7 +209,7 @@ for(file in files){
                                matchups_final)
   
   write.csv(matchups_final_write,
-            "~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/man_defense_off_coverage_assignments_all.csv",
+            "~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/man_defense_off_coverage_assignments_all_lbs.csv",
             row.names = FALSE)
   
 }
@@ -227,15 +231,15 @@ def_players_count = matchups_final_write %>%
 epa_when_targeted = matchups_final_write %>%
   inner_join(targeted_receiver) %>%
   mutate(targeted = targetNflId == nflId_off) %>%
-  inner_join(plays %>% select(gameId, playId, epa)) %>%
+  inner_join(plays %>% dplyr::select(gameId, playId, epa)) %>%
   group_by(nflId_def) %>%
   summarize(man_count = n(),
             perc_targeted = mean(1*targeted, na.rm = TRUE),
             epa_when_targeted = mean(if_else(targeted, epa, as.numeric(NA)), na.rm = TRUE)) %>%
   arrange(desc(man_count)) %>%
   inner_join(players %>%
-               select(nflId, displayName, position), by = c("nflId_def" = "nflId")) %>%
-  select(displayName, position, everything()) %>%
+               dplyr::select(nflId, displayName, position), by = c("nflId_def" = "nflId")) %>%
+  dplyr::select(displayName, position, everything()) %>%
   filter(man_count >= 100)
 
 
