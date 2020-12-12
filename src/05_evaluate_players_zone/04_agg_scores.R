@@ -107,3 +107,11 @@ write.csv(skills_table,
           row.names = FALSE)
 
 check = read.csv("~/Desktop/CoverageNet/src/04_evaluate_players/outputs/overall_player_skills_summary.csv")
+
+check2 = skills_table %>%
+  full_join(check,
+             by = c("position", "displayName", "nflId_def")) %>%
+  mutate(eps_tot = eps_zone_coverage + eps_man_coverage) %>%
+  dplyr::select("position", "displayName", "nflId_def",
+                "eps_tot", "eps_zone_coverage","eps_man_coverage") %>%
+  arrange(desc(eps_tot))

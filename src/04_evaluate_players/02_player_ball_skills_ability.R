@@ -277,7 +277,7 @@ ball_skills_ability3[is.na(ball_skills_ability3)] = 0
 
 ball_skills_ability3 = ball_skills_ability3 %>%
   mutate(eps_saved_ball_skills_per_target_w_penalties = (eps_saved_ball_skills_per_target*targets + 
-                                                      ball_skills_penalties*avg_ball_skills_penalties_eps)/(avg_ball_skills_penalties_eps + targets),
+                                                      ball_skills_penalties*avg_ball_skills_penalties_eps)/(ball_skills_penalties + targets),
          eps_saved_ball_skills_w_penalties = eps_saved_ball_skills + ball_skills_penalties*avg_ball_skills_penalties_eps + 
            ball_skills_defensive_penalties_man_avg*(ball_skills_penalties + targets),
          hands_on_ball_plays = interceptions + PB,
