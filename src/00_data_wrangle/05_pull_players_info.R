@@ -158,3 +158,27 @@ player_df_final = players_teams_final %>%
   dplyr::select(displayName, everything())
 
 write.csv(player_df_final, "~/Desktop/CoverageNet/src/00_data_wrangle/helper_tables/dashboard_player_info.csv")
+
+
+# Getting Team Info -------------------------------------------------------
+
+teams = games %>%
+  distinct(homeTeamAbbr) %>%
+  rename(teamName = homeTeamAbbr) %>%
+  mutate(teamImageUrl = paste0("https://a.espncdn.com/combiner/i?img=/i/teamlogos/nfl/500/",
+                               str_to_lower(teamName),
+                               ".png&w=40&h=40&cquality=40&scale=crop&location=origin&transparent=true")) %>%
+  mutate(division = case_when(teamName %in% c('NE', 'NYJ', 'BUF', 'MIA') ~ 'AFC East',
+                              teamName %in% c('CLE', 'PIT', 'BAL', 'CIN') ~ 'AFC North',
+                              teamName %in% c('IND', 'JAX', 'TEN', 'HOU') ~ 'AFC South',
+                              teamName %in% c('DEN', 'KC', 'OAK', 'LAC') ~ 'AFC West',
+                              teamName %in% c('DAL', 'WAS', 'NYG', 'PHI') ~ 'NFC East',
+                              teamName %in% c('CHI', 'GB', 'DET', 'MIN') ~ 'NFC North',
+                              teamName %in% c('ATL', 'CAR', 'NO', 'TB') ~ 'NFC South',
+                              teamName %in% c('SEA', 'SF', 'ARI', 'LA') ~ 'NFC West',
+                              TRUE ~ 'ERROR')) %>%
+  mutate(conference = str_split(division, " ")[[1]][1]) %>%
+  arrange(division)
+
+write.csv(teams, "~/Desktop/CoverageNet/src/00_data_wrangle/helper_tables/dashboard_team_info.csv")
+
