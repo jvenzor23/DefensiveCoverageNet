@@ -25,36 +25,25 @@ plays = read.csv("~/Desktop/CoverageNet/inputs/plays.csv")
 targeted_receiver = read.csv("~/Desktop/CoverageNet/inputs/targetedReceiver.csv")
 coverages_week1 = read.csv("~/Desktop/CoverageNet/inputs/coverages_week1.csv")
 
-pbp_data = read.csv("~/Desktop/CoverageNet/src/00_data_wrangle/outputs/week1.csv")
+pbp_data = read.csv("~/Desktop/CoverageNet/src/00_data_wrangle/outputs/week7.csv")
 
-man_zone_classification = read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/safeties_pass_attempts_man_zone_classes.csv")
-
-
-pbp_data = pbp_data %>%
-  inner_join(man_zone_classification %>%
-               distinct(gameId, playId))
 # Animating a Play --------------------------------------------------------
 
-## Select Play
+## dplyr::select( Play
 example.play = pbp_data %>%
   inner_join(
     pbp_data %>%
-      select(gameId, playId) %>%
-      filter(gameId == 2018090600,
-            playId == 492) %>%
+      dplyr::select(gameId, playId) %>%
+      filter(gameId == 2018102200,
+            playId == 2196) %>%
       distinct()
       # sample_n(1)
-  ) %>%
-  left_join(man_zone_classification)
+  )
 
-example.zone.classification = man_zone_classification %>%
-  inner_join(example.play %>%
-               select(gameId, playId, nflId, jerseyNumber) %>%
-               distinct()) 
 
 example.play.info = plays %>%
   inner_join(example.play %>%
-               select(gameId, playId) %>%
+               dplyr::select(gameId, playId) %>%
                distinct()) %>%
   inner_join(targeted_receiver) %>%
   inner_join(coverages_week1)

@@ -24,14 +24,15 @@ games = read.csv("~/Desktop/CoverageNet/inputs/games.csv")
 plays = read.csv("~/Desktop/CoverageNet/inputs/plays.csv")
 targeted_receiver = read.csv("~/Desktop/CoverageNet/inputs/targetedReceiver.csv")
 
+
 # man_zone_classification = rbind(
-#   read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/corners_pass_attempts_man_zone_classes.csv") %>%
+#   read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/all_positions_pass_attempts_man_zone_classes.csv") %>%
 #     dplyr::select(gameId, playId, nflId, zone_probability),
-#   read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/corners_sacks_man_zone_classes.csv") %>%
+#   read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/all_positions_sacks_man_zone_classes.csv") %>%
 #     dplyr::select(gameId, playId, nflId, zone_probability),
-#   read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/safeties_pass_attempts_man_zone_classes.csv") %>%
+#   read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/linebackers_pass_attempts_man_zone_classes.csv") %>%
 #     dplyr::select(gameId, playId, nflId, zone_probability),
-#   read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/safeties_sacks_man_zone_classes.csv") %>%
+#   read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/linebackers_sacks_man_zone_classes.csv") %>%
 #     dplyr::select(gameId, playId, nflId, zone_probability)
 # ) %>%
 #   arrange(gameId, playId, nflId)
@@ -40,14 +41,9 @@ man_zone_classification = rbind(
   read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/all_positions_pass_attempts_man_zone_classes.csv") %>%
     dplyr::select(gameId, playId, nflId, zone_probability),
   read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/all_positions_sacks_man_zone_classes.csv") %>%
-    dplyr::select(gameId, playId, nflId, zone_probability),
-  read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/linebackers_pass_attempts_man_zone_classes.csv") %>%
-    dplyr::select(gameId, playId, nflId, zone_probability),
-  read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/linebackers_sacks_man_zone_classes.csv") %>%
     dplyr::select(gameId, playId, nflId, zone_probability)
 ) %>%
   arrange(gameId, playId, nflId)
-
 
 # Filtering to Players In Man Coverage ------------------------------------
 
@@ -136,6 +132,13 @@ for(file in files){
            position_off = position) %>%
     dplyr::select(gameId, playId, frameId, nflId_off, ends_with("_off"))
   
+  offense_closest_player = pbp_data_dbs_in_man %>%
+    inner_join(pbp_data_offense) %>%
+    mutate(dist = sqrt((x - x_off)^2 +  (y - y_off)^2)) %>%
+    group_by(gameId, playId, nflId_off) %>%
+    filter(dist == min(dist)) %>%
+    distinct(gameId, playId, nflId_off, .keep_all = TRUE)
+  
   pbp_data_pre_agg = pbp_data_dbs_in_man %>%
     inner_join(pbp_data_offense) %>%
     mutate(dist = sqrt((x - x_off)^2 +  (y - y_off)^2)) %>%
@@ -155,11 +158,30 @@ for(file in files){
            y_rot_45 = (y - y_snap)*cos(pi/4) + (x - x_snap)*sin(pi/4),
            x_off_rot_45 = (x_off - x_snap)*cos(pi/4) - (y_off - y_snap)*sin(pi/4),
            y_off_rot_45 = (y_off - y_snap)*cos(pi/4) + (x_off - x_snap)*sin(pi/4)) %>%
+    inner_join(pbp_data %>%
+                 filter(!is.na(nflId),
+                        !IsOnOffense) %>%
+                 dplyr::select(gameId, playId, frameId, nflId, x, y) %>%
+                 rename(nflId_other_def = nflId,
+                        x_other_def = x,
+                        y_other_def = y)) %>%
+    filter(nflId != nflId_other_def) %>%
+    mutate(dist2 = sqrt((x_off - x_other_def)^2 + (y_off - y_other_def)^2)) %>%
+    group_by(gameId, playId, nflId, frameId, nflId_off) %>%
+    filter(dist2 == min(dist2)) %>%
+    ungroup() %>%
+    mutate(ratio = dist/(sqrt((x_off - x_other_def)^2 + (y_off - y_other_def)^2))) %>%
     group_by(gameId, playId, nflId, nflId_off, position_off) %>%
     summarize(movement_cor = (cor(x, x_off) + cor(y, y_off))/2,
               movement_cor2 = (cor(x_rot_45, x_off_rot_45) + cor(y_rot_45, y_off_rot_45))/2,
               avg_sep = mean(dist),
-              sep_at_end = max(dist_last_frame)) %>%
+              min_sep = min(dist),
+              sep_at_end = max(dist_last_frame),
+              ratio_min = min(ratio),
+              ratio_25_quantile = quantile(ratio, .25),
+              ratio_50_quantile = quantile(ratio, .50),
+              ratio_75_quantile = quantile(ratio, .75),
+              ratio_at_end = ratio[length(ratio)]) %>%
     mutate(movement_cor = pmax(movement_cor, movement_cor2)) %>%
     dplyr::select(-movement_cor2)
   
@@ -173,21 +195,27 @@ for(file in files){
   # requiring greater than .6 correlation, and keeping the player with the lowest
   # avg sep
   pbp_data_agg = non_qb_data_pre_agg %>%
-    filter((movement_cor > .6)|(avg_sep < 10)) %>%
+    filter((movement_cor > 0)|(avg_sep < 10)) %>%
     group_by(gameId, playId, nflId) %>%
     filter(movement_cor > 0,
+           ratio_min < 1,
            (avg_sep < 10)|(movement_cor > .95),
-           avg_sep < 15,
-           sep_at_end < 12.5) %>%
+           avg_sep < 12.5,
+           sep_at_end < 12.5,
+           ratio_50_quantile < 3,
+           (ratio_at_end < 2)|(sep_at_end < 4)) %>%
     # logic to say, elimiate something if cor is way worse, with sep at end not much
     # better
-    mutate(max_cor = max(movement_cor),
-           max_cor_sep_at_end = sep_at_end[which.max(movement_cor)],
-           max_avg_sep = avg_sep[which.max(movement_cor)]) %>%
-    mutate(cor_reduction = (movement_cor - max_cor)/(max_cor),
-           sep_at_end_improve = (max_cor_sep_at_end - sep_at_end)/max_cor_sep_at_end) %>%
-    filter(((cor_reduction > -.25)&(sep_at_end_improve > .30))|(movement_cor == max(movement_cor))) %>%
-    filter(sep_at_end == min(sep_at_end))
+    mutate(min_ratio = min(ratio_50_quantile),
+           min_ratio_cor = movement_cor[which.min(ratio_50_quantile)],
+           min_ratio_sep_at_end = sep_at_end[which.min(ratio_50_quantile)],
+           min_ratio_avg_sep = avg_sep[which.min(ratio_50_quantile)]) %>%
+    mutate(min_ratio_increase = (ratio_50_quantile - min_ratio)/(min_ratio),
+           cor_improve = (movement_cor - min_ratio_cor)/(min_ratio_cor),
+           sep_at_end_improve = (min_ratio_sep_at_end - sep_at_end)/min_ratio_sep_at_end,
+           avg_sep_improve = (min_ratio_avg_sep - avg_sep)/min_ratio_avg_sep) %>%
+    filter(((cor_improve > .5)&(min_ratio_increase < 1.25))|(ratio_50_quantile == min(ratio_50_quantile))) %>%
+    filter(avg_sep == min(avg_sep))
   
   # checking if they rushed
   pbp_data_agg2 = pbp_data_agg %>%

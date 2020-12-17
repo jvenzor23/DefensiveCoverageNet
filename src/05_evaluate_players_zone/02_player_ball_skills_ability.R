@@ -42,6 +42,7 @@ players = read.csv("~/Desktop/CoverageNet/inputs/players.csv")
 games = read.csv("~/Desktop/CoverageNet/inputs/games.csv")
 plays = read.csv("~/Desktop/CoverageNet/inputs/plays.csv", stringsAsFactors = FALSE)
 targeted_receiver = read.csv("~/Desktop/CoverageNet/inputs/targetedReceiver.csv")
+drops = read.csv("~/Desktop/CoverageNet/src/00_data_wrangle/helper_tables/drops.csv")
 
 wr_db_man_matchups = read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/man_defense_off_coverage_assignments_all_lbs.csv")
 wr_db_zone_matchups_tot = read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/zone_defense_off_coverage_assignments_all_lbs.csv")
@@ -58,6 +59,9 @@ pass_arrived_frames = read.csv("~/Desktop/CoverageNet/src/03_coverageNet/01_scor
 # pass result data
 pass_result_epa = read.csv("~/Desktop/CoverageNet/src/03_coverageNet/00_score_YAC/outputs/yac_yaint_epa_data.csv") %>%
   dplyr::select(gameId, playId, epa_throw)
+
+pass_result_frames = read.csv("~/Desktop/CoverageNet/src/03_coverageNet/00_score_YAC/outputs/pass_attempts_all.csv") %>%
+  distinct(gameId, playId, frameId)
 
 dpi_classification = read.csv("~/Desktop/CoverageNet/src/04_evaluate_players/pass_interference_classification/outputs/dpi_classification.csv")
 
@@ -114,10 +118,10 @@ interceptions_incompletions_remove = wr_db_zone_matchups %>%
            is.na(pass_defense_1_player_name)&
            is.na(pass_defense_2_player_name)) %>%
   rowwise() %>%
-  mutate(is_player = replace_na(grepl(str_to_lower(interception_player_name), str_to_lower(displayNameNew)), FALSE)|
-           replace_na(grepl(str_to_lower(pass_defense_1_player_name), str_to_lower(displayNameNew)), FALSE)|
-           replace_na(grepl(str_to_lower(pass_defense_2_player_name), str_to_lower(displayNameNew)), FALSE),
-         interceptor_right = replace_na(grepl(str_to_lower(interception_player_name), str_to_lower(displayNameNew)), TRUE)) 
+  mutate(is_player = replace_na(grepl(str_to_lower(trimws(gsub("(III)|(II)|(Jr.)|(Sr.)", "", interception_player_name))), str_to_lower(trimws(gsub("(III)|(II)|(Jr.)|(Sr.)", "", displayNameNew)))), FALSE)|
+           replace_na(grepl(str_to_lower(trimws(gsub("(III)|(II)|(Jr.)|(Sr.)", "", pass_defense_1_player_name))), str_to_lower(trimws(gsub("(III)|(II)|(Jr.)|(Sr.)", "", displayNameNew)))), FALSE)|
+           replace_na(grepl(str_to_lower(trimws(gsub("(III)|(II)|(Jr.)|(Sr.)", "", pass_defense_2_player_name))), str_to_lower(trimws(gsub("(III)|(II)|(Jr.)|(Sr.)", "", displayNameNew)))), FALSE),
+         interceptor_right = replace_na(grepl(str_to_lower(trimws(gsub("(III)|(II)|(Jr.)|(Sr.)", "", interception_player_name))), str_to_lower(trimws(gsub("(III)|(II)|(Jr.)|(Sr.)", "", displayNameNew)))), TRUE)) 
 
 distinct_nflScrapR_names = interceptions_incompletions_remove %>%
   dplyr::select(ends_with("player_name")) %>%
@@ -144,7 +148,6 @@ pbus = interceptions_incompletions_remove %>%
   filter(is_player & is.na(interception_player_name)) %>%
   group_by(nflId_def) %>%
   summarize(PB = n())
-
 
 # Identifying Penalties to Remove -----------------------------------------
 
@@ -217,7 +220,8 @@ ball_skills_ability = pass_arrived_epa %>%
   filter(!is.na(targetNflId),
          !is.na(epa_throw)) %>%
   inner_join(wr_db_zone_matchups %>%
-               rename(targetNflId = nflId_off))
+               rename(targetNflId = nflId_off)) %>%
+  anti_join(drops)
 
 ball_skills_ability$fitted_epa_pass_throw = lm(epa_throw ~ epa_pass_arrived, data = ball_skills_ability)$fitted.values
 
@@ -227,6 +231,109 @@ ball_skills_ability %>%
   ggplot() +
   geom_point(aes(x = epa_pass_arrived, y = epa_throw)) +
   geom_line(aes(x = epa_pass_arrived, y = fitted_epa_pass_throw), color = "blue")
+
+# Identifying Miscellaneous pbus/interceptions! ---------------------------
+
+# correct_plays = interceptions_incompletions_remove %>%
+#   filter(is_player & is.na(interception_player_name))
+# 
+# # getting all zone players
+# man_zone_classification = rbind(
+#   read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/all_positions_pass_attempts_man_zone_classes.csv") %>%
+#     dplyr::select(gameId, playId, nflId, zone_probability),
+#   read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/all_positions_sacks_man_zone_classes.csv") %>%
+#     dplyr::select(gameId, playId, nflId, zone_probability)
+# ) %>%
+#   arrange(gameId, playId, nflId) %>%
+#   distinct(gameId, playId, nflId, .keep_all = TRUE)
+# 
+# man_coverage = read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/man_defense_off_coverage_assignments_all_lbs.csv")
+# 
+# zone_coverage_players = man_zone_classification %>%
+#   anti_join(man_coverage,
+#             by = c("gameId", "playId", "nflId" = "nflId_def")) %>%
+#   distinct(nflId)
+# 
+# players_clean = players %>%
+#   inner_join(zone_coverage_players) %>%
+#   separate(displayName, into = c("first", "rest"), sep = "\\s",
+#            extra = "merge") %>%
+#   mutate(displayNameNew = paste0(substring(first, 1, 1), ".",
+#                                  rest)) %>%
+#   mutate(displayNameNew = case_when(displayNameNew == "S.Griffin" ~ "SL.Griffin",
+#                                     displayNameNew == "H.Ha Clinton-Dix" ~ "H.Clinton-Dix",
+#                                     displayNameNew ==  "B.Williams" ~ "Bra.Williams",
+#                                     displayNameNew == "C.Davis" ~ "C.Davis III",
+#                                     displayNameNew == "D.Harris" ~ "Dev.Harris",
+#                                     TRUE ~ displayNameNew)) %>%
+#   mutate(displayNameNew_clean = str_to_lower(trimws(gsub("(III)|(II)|(Jr.)|(Sr.)", "", displayNameNew)))) %>%
+#   dplyr::select(nflId, displayNameNew_clean)
+# 
+# zone_coverage_plays = man_zone_classification %>%
+#   anti_join(man_coverage,
+#             by = c("gameId", "playId", "nflId" = "nflId_def")) %>%
+#   distinct(gameId, playId, nflId)
+# 
+# zone_coverage_plays_not_accounted_for = zone_coverage_plays %>%
+#   anti_join(ball_skills_ability,
+#               by = c("gameId", "playId", "nflId" = "nflId_def"))
+# 
+# interceptions_incompletions_not_identified = zone_coverage_plays_not_accounted_for %>%
+#   inner_join(plays %>%
+#                filter(passResult %in% c("IN", "I")) %>%
+#                distinct(gameId, playId)) %>%
+#   inner_join(players %>%
+#                dplyr::select(nflId, displayName)) %>%
+#   left_join(pbp_data_2018) %>%
+#   separate(displayName, into = c("first", "rest"), sep = "\\s",
+#            extra = "merge") %>%
+#   mutate(displayNameNew = paste0(substring(first, 1, 1), ".",
+#                                  rest)) %>%
+#   mutate(displayNameNew = case_when(displayNameNew == "S.Griffin" ~ "SL.Griffin",
+#                                     displayNameNew == "H.Ha Clinton-Dix" ~ "H.Clinton-Dix",
+#                                     displayNameNew ==  "B.Williams" ~ "Bra.Williams",
+#                                     displayNameNew == "C.Davis" ~ "C.Davis III",
+#                                     displayNameNew == "D.Harris" ~ "Dev.Harris",
+#                                     TRUE ~ displayNameNew)) %>%
+#   mutate(all_null_flag = is.na(interception_player_name)&
+#            is.na(pass_defense_1_player_name)&
+#            is.na(pass_defense_2_player_name)) %>%
+#   rowwise() %>%
+#   mutate(is_player = replace_na(grepl(str_to_lower(trimws(gsub("(III)|(II)|(Jr.)|(Sr.)", "", interception_player_name))), str_to_lower(trimws(gsub("(III)|(II)|(Jr.)|(Sr.)", "", displayNameNew)))), FALSE)|
+#            replace_na(grepl(str_to_lower(trimws(gsub("(III)|(II)|(Jr.)|(Sr.)", "", pass_defense_1_player_name))), str_to_lower(trimws(gsub("(III)|(II)|(Jr.)|(Sr.)", "", displayNameNew)))), FALSE)|
+#            replace_na(grepl(str_to_lower(trimws(gsub("(III)|(II)|(Jr.)|(Sr.)", "", pass_defense_2_player_name))), str_to_lower(trimws(gsub("(III)|(II)|(Jr.)|(Sr.)", "", displayNameNew)))), FALSE),
+#          interceptor_right = replace_na(grepl(str_to_lower(trimws(gsub("(III)|(II)|(Jr.)|(Sr.)", "", interception_player_name))), str_to_lower(trimws(gsub("(III)|(II)|(Jr.)|(Sr.)", "", displayNameNew)))), FALSE)) %>%
+#   filter(!all_null_flag,
+#          (is_player|interceptor_right)) %>%
+#   filter(is.na(interception_player_name)|interceptor_right)
+# 
+# ints_missed = interceptions_incompletions_not_identified %>%
+#   dplyr::select(gameId, playId, interception_player_name) %>%
+#   filter(!is.na(interception_player_name))  %>%
+#   mutate(interception_player_name_clean = str_to_lower(trimws(gsub("(III)|(II)|(Jr.)|(Sr.)", "", interception_player_name)))) %>%
+#   inner_join(players_clean,
+#              by = c("interception_player_name_clean"="displayNameNew_clean")) %>%
+#   inner_join(pass_arrived_epa) %>%
+#   inner_join(pass_result_epa) %>%
+#   filter(!is.na(epa_throw)) %>%
+#   group_by(nflId) %>%
+#   summarize(ints_misc = n(),
+#             ints_misc_eps = sum(epa_pass_arrived - epa_throw))
+# 
+# pbus_missed = interceptions_incompletions_not_identified %>%
+#   dplyr::select(gameId, playId, interception_player_name, pass_defense_1_player_name) %>%
+#   filter(is.na(interception_player_name)) %>%
+#   mutate(pass_defense_1_player_name_clean = str_to_lower(trimws(gsub("(III)|(II)|(Jr.)|(Sr.)", "", pass_defense_1_player_name)))) %>%
+#   inner_join(players_clean,
+#              by = c("pass_defense_1_player_name_clean"="displayNameNew_clean")) %>%
+#   inner_join(pass_arrived_epa) %>%
+#   inner_join(pass_result_epa) %>%
+#   filter(!is.na(epa_throw)) %>%
+#   group_by(nflId) %>%
+#   summarize(pbus_misc = n(),
+#             pbus_misc_eps = sum(epa_pass_arrived - epa_throw))
+# 
+
 
 
 # Grouping By Player ------------------------------------------------------

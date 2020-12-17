@@ -111,6 +111,8 @@ for(file in files){
   
 }
 
+rushers_total = read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/rushers.csv")
+
 corners_pass_data = read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/corners_pass_attempts_man_zone_gmm_features.csv")
 corners_sack_data = read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/corners_sacks_man_zone_gmm_features.csv")
 

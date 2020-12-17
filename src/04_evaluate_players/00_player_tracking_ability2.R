@@ -44,8 +44,10 @@ plays = read.csv("~/Desktop/CoverageNet/inputs/plays.csv", stringsAsFactors = FA
 targeted_receiver = read.csv("~/Desktop/CoverageNet/inputs/targetedReceiver.csv")
 epa_tracking_total = read.csv("~/Desktop/CoverageNet/src/03_coverageNet/03_score_tracking/outputs/routes_tracking_epa.csv")
 wr_db_man_matchups = read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/man_defense_off_coverage_assignments_all_lbs.csv")
-wr_db_zone_matchups_tot = read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/zone_defense_off_coverage_assignments_all_lbs.csv")
-
+# dropping WRs with double teams
+wr_db_man_matchups = wr_db_man_matchups %>%
+  group_by(gameId, playId, nflId_off) %>%
+  filter(n() == 1)
 
 # setwd("~/Desktop/NFL_PBP_DATA/")
 # pbp_data_2018 = read_csv("reg_pbp_2018.csv", col_types = cols()) %>%
@@ -68,6 +70,32 @@ check_event = pt_data %>%
   group_by(passResult, event) %>%
   summarize(count = n()) %>%
   arrange(passResult, desc(count))
+
+
+# Removing Plays Where a Player Gets Zone Help ----------------------------
+
+wr_db_zone_matchups_tot = read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/zone_defense_off_coverage_assignments_all_lbs.csv")
+
+zone_routes = epa_tracking_total %>%
+  inner_join(wr_db_zone_matchups_tot,
+             by = c("gameId", "playId", "targetNflId" = "nflId_opp")) %>%
+  filter(frameId >= frameId_start,
+         frameId <= frameId_end) %>%
+  group_by(gameId, playId, nflId, targetNflId, frameId_start) %>%
+  mutate(nFrames = max(frameId) - min(frameId) + 1) %>%
+  filter(nFrames >= 10) %>%
+  dplyr::select(-nFrames) %>%
+  dplyr::select(gameId, playId, nflId, targetNflId) %>%
+  rename(nflId_def = nflId,
+         nflId_off = targetNflId) %>%
+  ungroup() %>%
+  dplyr::select(-frameId_start) %>%
+  distinct()
+
+wr_db_man_matchups = wr_db_man_matchups %>%
+  anti_join(zone_routes %>%
+              dplyr::select(-nflId_def))
+  
 
 # Getting Penalties --------------------------------------------------------
 
@@ -134,10 +162,8 @@ tracking_defensive_penalties2 = tracking_defensive_penalties %>%
   dplyr::select(gameId, playId, nflId, penaltyCodes, enforced_flag, offsetting_flag, my_epa) %>%
   rename(nflId_def = nflId)
 
-tracking_defensive_penalties_man_avg = wr_db_zone_matchups_tot %>%
-  left_join(tracking_defensive_penalties2 %>%
-            anti_join(wr_db_man_matchups),
-            by = c("gameId", "playId", "nflId" = "nflId_def")) %>%
+tracking_defensive_penalties_man_avg = wr_db_man_matchups %>%
+  left_join(tracking_defensive_penalties2) %>%
   ungroup() %>%
   summarize(avg_penalty_epa_per_route = mean(replace_na(my_epa, 0)))
 
@@ -145,173 +171,331 @@ tracking_defensive_penalties_man_avg = wr_db_zone_matchups_tot %>%
 # Removing Penalty Plays From Scoring Data Set ----------------------------
 
 epa_tracking_total_penalties_removed = epa_tracking_total %>%
-  inner_join(wr_db_zone_matchups_tot,
-             by = c("gameId", "playId", "targetNflId" = "nflId_opp")) %>%
-  filter(frameId >= frameId_start,
-         frameId <= frameId_end) %>%
-  anti_join(tracking_defensive_penalties2,
-            by = c("gameId", "playId", "nflId" = "nflId_def")) %>%
-  group_by(gameId, playId, nflId, targetNflId, frameId_start) %>%
-  mutate(nFrames = max(frameId) - min(frameId) + 1) %>%
-  filter(nFrames >= 5) %>%
-  dplyr::select(-nFrames)
+  inner_join(wr_db_man_matchups,
+             by = c("gameId", "playId", "targetNflId" = "nflId_off")) %>%
+  anti_join(tracking_defensive_penalties2) %>%
+  dplyr::select(names(epa_tracking_total))
 
 # Translating epa_per_route to eps_per_play -------------------------------
 
-epa_to_eps_per_play = epa_tracking_total_penalties_removed %>%
-  group_by(gameId, playId, targetNflId, nflId, frameId_start) %>%
-  # summarize(max_epa = max(epa_pass_attempt)) %>%
-    # max_epa = epa_pass_attempt[length(epa_pass_attempt)]) %>%
-  # group_by(gameId, playId, targetNflId) %>%
-  # filter(frameId_start == max(frameId_start)) %>%
+
+# epa_to_eps_per_play = epa_tracking_total %>%
+#   left_join(rbind.data.frame(zone_routes, wr_db_man_matchups),
+#             by = c("gameId", "playId", "targetNflId" = "nflId_off")) %>%
+#   anti_join(tracking_defensive_penalties2) %>%
+#   group_by(gameId, playId, targetNflId) %>%
+#   ungroup() %>%
+#   group_by(gameId, playId, targetNflId) %>%
+#   summarize(max_epa = max(epa_pass_attempt)) %>%
+#   inner_join(my_epa %>%
+#                dplyr::select(-my_ep)) %>%
+#   mutate(max_epa_disc = floor(max_epa*10)/10 + .05) %>%
+#   group_by(max_epa_disc) %>%
+#   summarize(count = n(),
+#             avg_my_epa = mean(my_epa)) %>%
+#   arrange(max_epa_disc) %>%
+#   filter(count >= 50)
+# 
+# 
+# ggplot() +
+#   geom_line(data = epa_to_eps_per_play2 %>%
+#               mutate(time_after_snap= as.factor(time_after_snap)),
+#             aes(x = max_epa_disc, y = avg_my_epa, color = time_after_snap)) + 
+#   geom_line(data = epa_to_eps_per_play,
+#             aes(x = max_epa_disc, y = avg_my_epa), color = "black", size = 2)
+# 
+# library(scam)
+# fitted.values = scam(avg_my_epa ~ s(max_epa_disc, k = 10, bs = "mpi"),
+#                      # weights = count,
+#                      data = epa_to_eps_per_play)$fitted.values
+# 
+# epa_to_eps_model = scam(avg_my_epa ~ s(max_epa_disc, k = 10, bs = "mpi"),
+#                         # weights = count,
+#                         data = epa_to_eps_per_play)
+# 
+# epa_to_eps_per_play$fitted_avg_my_epa = fitted.values
+# 
+# epa_to_eps_per_play %>%
+#   ggplot() +
+#   geom_point(aes(x = max_epa_disc, y = avg_my_epa)) +
+#   geom_line(aes(x =max_epa_disc, y = fitted.values), color = "blue")
+
+avg_epa_per_passing_play = mean((epa_tracking_total_penalties_removed %>%
+                                   group_by(gameId, playId, targetNflId) %>%
+                                   inner_join(my_epa %>%
+                                                dplyr::select(-my_ep)) %>%
+                                   ungroup() %>%
+                                   distinct(gameId, playId, my_epa))$my_epa)
+
+avg_epa_per_passing_play_by_time = epa_tracking_total_penalties_removed %>%
+  inner_join(wr_db_man_matchups,
+             by = c("gameId", "playId", "targetNflId" = "nflId_off")) %>%
   inner_join(my_epa %>%
                dplyr::select(-my_ep)) %>%
-  mutate(max_epa_disc = floor(epa_pass_attempt*4)/4 + .125) %>%
-  group_by(max_epa_disc) %>%
+  group_by(gameId, playId, nflId_def) %>%
+  mutate(time_to_throw = .5 + (frameId - min(frameId))/10) %>%
+  # filter(time_to_throw == min(time_to_throw)) %>%
+  # ungroup() %>%
+  mutate(time_to_throw = case_when(time_to_throw <= 1 ~ 1,
+                                   time_to_throw >= 4.5 ~ 4.5,
+                                   TRUE ~ time_to_throw)) %>%
+  distinct(gameId, playId, my_epa, nflId_def, time_to_throw) %>%
+  group_by(time_to_throw) %>%
   summarize(count = n(),
-            avg_my_epa = mean(my_epa)) %>%
-  arrange(max_epa_disc) %>%
-  filter(count >= 150)
-
-library(scam)
-fitted.values = scam(avg_my_epa ~ s(max_epa_disc, k = 5, bs = "mpi"),
-                     # weights = count,
-                     data = epa_to_eps_per_play)$fitted.values
-
-epa_to_eps_model = scam(avg_my_epa ~ s(max_epa_disc, k = 5, bs = "mpi"),
-                        # weights = count,
-                        data = epa_to_eps_per_play)
-
-epa_to_eps_per_play$fitted_avg_my_epa = fitted.values
-
-epa_to_eps_per_play %>%
-  ggplot() +
-  geom_point(aes(x = max_epa_disc, y = avg_my_epa)) +
-  geom_line(aes(x =max_epa_disc, y = fitted.values), color = "blue")
-
-avg_epa_per_passing_play = mean((epa_tracking_total %>%
-                                   inner_join(wr_db_zone_matchups_tot,
-                                              by = c("gameId", "playId", "targetNflId" = "nflId_opp")) %>%
-                                   filter(frameId >= frameId_start,
-                                          frameId <= frameId_end) %>%
-                                   group_by(gameId, playId, nflId, targetNflId, frameId_start) %>%
-                                   mutate(nFrames = max(frameId) - min(frameId) + 1) %>%
-                                   filter(nFrames >= 5) %>%
-                                   dplyr::select(-nFrames) %>%
-                                   inner_join(my_epa %>%
-                                                dplyr::select(-my_ep)))$my_epa)
+            avg_epa = mean(my_epa),
+            med_epa = median(my_epa))
 
 
-epa_to_eps_per_play2 = epa_to_eps_per_play %>%
-  mutate(fitted_avg_eps = avg_epa_per_passing_play - fitted_avg_my_epa)
-
-epa_to_eps_per_play2 %>%
-  ggplot() +
-  geom_line(aes(x =max_epa_disc, y = fitted_avg_eps), color = "blue")
+# epa_to_eps_per_play2 = epa_to_eps_per_play %>%
+#   mutate(fitted_avg_eps = avg_epa_per_passing_play - fitted_avg_my_epa)
+# 
+# epa_to_eps_per_play2 %>%
+#   ggplot() +
+#   geom_line(aes(x =max_epa_disc, y = fitted_avg_eps), color = "blue")
 
 
 # Getting Throw Time Dist -------------------------------------------------
 
-time_to_hold_dist =  epa_tracking_total %>%
-  inner_join(wr_db_zone_matchups_tot,
-                                by = c("gameId", "playId", "targetNflId" = "nflId_opp")) %>%
-  filter(frameId >= frameId_start,
-         frameId <= frameId_end) %>%
-  anti_join(tracking_defensive_penalties2,
-            by = c("gameId", "playId", "nflId" = "nflId_def")) %>%
-  group_by(gameId, playId, nflId, targetNflId, frameId_start) %>%
+time_to_throw_dist = epa_tracking_total_penalties_removed %>%
   anti_join(plays %>%
               filter(passResult == 'S') %>%
               distinct(gameId, playId)) %>%
-  arrange(gameId, playId, targetNflId, nflId, frameId) %>%
-  group_by(gameId, playId, targetNflId, nflId, frameId_start) %>%
-  mutate(time_after_entering_zone = ((frameId - min(frameId)) + 1)*.1) %>%
+  group_by(gameId, playId, targetNflId) %>%
+  mutate(time_after_snap = (5 + (frameId - min(frameId)))*.1) %>%
   ungroup() %>%
-  group_by(gameId, playId, nflId, targetNflId) %>%
-  summarize(time_to_hold = max(time_after_entering_zone))
+  group_by(gameId, playId) %>%
+  summarize(time_to_throw = max(time_after_snap))
 
-# sn_fit = fitdist(time_to_hold_dist$time_to_hold,
-#                  distr = "sn",
-#                  method = "mse",
-#                  start = list("tau" = 0, "omega" = 2, "alpha" = 2))$estimate
+sn_fit = fitdist(time_to_throw_dist$time_to_throw,
+                 distr = "sn",
+                 method = "mle",
+                 start = list("tau" = 0, "omega" = 2.75, "alpha" = 3))$estimate
 
-time_to_hold_dist2 = time_to_hold_dist %>%
-  group_by(time_to_hold) %>%
+time_to_throw_dist2 = time_to_throw_dist %>%
+  group_by(time_to_throw) %>%
   summarize(count = n()) %>%
   mutate(perc = count/sum(count))
 
-# sn_fitted_vals = dsn(x = time_to_hold_dist2$time_to_hold, xi=0, omega=sn_fit[2], alpha=sn_fit[3], tau=sn_fit[1], dp=NULL, log=FALSE)
+sn_fitted_vals = dsn(x = time_to_throw_dist2$time_to_throw, xi=0, omega=sn_fit[2], alpha=sn_fit[3], tau=sn_fit[1], dp=NULL, log=FALSE)
 
-time_to_hold_dist2$fitted_perc = time_to_hold_dist2$perc/sum(time_to_hold_dist2$perc)
+time_to_throw_dist2$fitted_perc = sn_fitted_vals/10
 
-time_to_hold_dist2 %>%
+time_to_throw_dist2 %>%
   ggplot() +
-  geom_density(stat = "identity", aes(x = time_to_hold, y = fitted_perc),
+  geom_density(stat = "identity", aes(x = time_to_throw, y = fitted_perc),
                fill = "blue", alpha = .6) +
-  geom_density(stat = "identity", aes(x = time_to_hold, y = perc)) +
-  labs(x = "Time To Hold Zone",
+  geom_density(stat = "identity", aes(x = time_to_throw, y = perc)) +
+  labs(x = "Time To Pass Attempt(s)",
        y = "Probability Density")
 
 
 # Rating Defensive Backs --------------------------------------------------
 
-# full_probs = dsn(x = seq(0, 15, .1), xi=0, omega=sn_fit[2], alpha=sn_fit[3], tau=sn_fit[1], dp=NULL, log=FALSE)/10
+full_probs = dsn(x = seq(0, 15, .1), xi=0, omega=sn_fit[2], alpha=sn_fit[3], tau=sn_fit[1], dp=NULL, log=FALSE)/10
 
-# full_probs_df = data.frame("time_after_entering_zone" = seq(0, 15, .1),
-#                            "prob" = full_probs)
-
-full_probs_df = time_to_hold_dist2 %>%
-  dplyr::select(time_to_hold,
-                fitted_perc) %>%
-  rename(time_after_entering_zone = time_to_hold,
-         prob = fitted_perc)
+full_probs_df = data.frame("time_after_snap" = seq(0, 15, .1),
+                           "prob" = full_probs)
 
 # Looking at Max EPA over Each Interval Per Play --------------------------
 
-max_zone_coverage_tracking = epa_tracking_total_penalties_removed %>%
-  arrange(gameId, playId, targetNflId, nflId, frameId) %>%
-  group_by(gameId, playId, targetNflId, nflId, frameId_start) %>%
-  mutate(time_after_entering_zone = ((frameId - min(frameId) + 1))*.1) %>%
+max_man_coverage_tracking = epa_tracking_total_penalties_removed %>%
+  inner_join(wr_db_man_matchups,
+             by = c("gameId", "playId", "targetNflId" = "nflId_off")) %>%
+  group_by(gameId, playId, targetNflId) %>%
+  mutate(time_after_snap = (5 + (frameId - min(frameId)))*.1) %>%
   ungroup() %>%
-  group_by(gameId, playId, targetNflId, nflId, frameId_start) %>%
+  group_by(gameId, playId, nflId_def) %>%
   mutate(epa_pass_attempt_max = cummax(epa_pass_attempt)) %>%
-  ungroup() 
+  mutate(time_after_snap_model = if_else(time_after_snap > 4.5, 4.5, as.numeric(time_after_snap))) # %>%
+  # group_by(gameId, playId, nflId_def) %>%
+  # filter(frameId == max(frameId))
 
-max_zone_coverage_tracking$eps_tracking_avg = predict(epa_to_eps_model,
-                                                      max_zone_coverage_tracking %>%
-                                                       rename(max_epa_disc = epa_pass_attempt_max))
+# looping over all times
 
-max_zone_coverage_tracking = max_zone_coverage_tracking %>%
-  mutate(eps_tracking_per_play = avg_epa_per_passing_play - eps_tracking_avg)
+epa_to_eps_per_play_loop = epa_tracking_total_penalties_removed %>%
+  group_by(gameId, playId, targetNflId) %>%
+  mutate(time_after_snap = (5 + (frameId - min(frameId)))*.1) %>%
+  ungroup() %>%
+  mutate(time_after_snap = if_else(time_after_snap > 4.5, 4.5, as.numeric(time_after_snap))) %>%
+  ungroup() %>%
+  group_by(gameId, playId, time_after_snap, targetNflId) %>%
+  summarize(max_epa = max(epa_pass_attempt)) %>%
+  inner_join(my_epa %>%
+               dplyr::select(-my_ep)) %>%
+  mutate(max_epa_disc = floor(max_epa*10)/10 + .05) %>%
+  group_by(time_after_snap, max_epa_disc) %>%
+  summarize(count = n(),
+            avg_my_epa = mean(my_epa)) %>%
+  arrange(time_after_snap, max_epa_disc) %>%
+  filter(count >= 50)
 
-max_zone_coverage_tracking =  max_zone_coverage_tracking %>%
-  group_by(nflId, time_after_entering_zone) %>%
+epa_to_eps_per_play_loop %>%
+  mutate(time_after_snap = as.factor(time_after_snap)) %>%
+  ggplot() +
+  geom_line(aes(x = max_epa_disc, y = avg_my_epa, color = time_after_snap))
+
+epa_to_eps_per_play_loop %>%
+  inner_join(avg_epa_per_passing_play_by_time,
+             by = c("time_after_snap" = "time_to_throw")) %>%
+  mutate(eps = avg_epa - avg_my_epa) %>%
+  mutate(time_after_snap = as.factor(time_after_snap)) %>%
+  ggplot() +
+  geom_line(aes(x = max_epa_disc, y = eps, color = time_after_snap)) +
+  geom_hline(yintercept = 0)
+
+
+time_vect = (4 + seq(1:41))/10
+
+eps_vals_df_tot = data.frame()
+counter = 0
+for(time in time_vect){
+  
+  print(counter)
+  
+  max_man_coverage_tracking_iter = max_man_coverage_tracking %>%
+    filter(time_after_snap_model >=  time - .05,
+           time_after_snap_model <= time + .05)
+  
+  epa_to_eps_per_play_iter = epa_to_eps_per_play_loop %>%
+    filter(time_after_snap >=  time - .05,
+            time_after_snap <= time + .05)
+  
+  if(time <= 1){
+    avg_epa_per_passing_play =  (avg_epa_per_passing_play_by_time %>%
+      filter(time_to_throw >=  1 - .05,
+             time_to_throw <= 1 + .05))$avg_epa
+  }else{
+    avg_epa_per_passing_play =  (avg_epa_per_passing_play_by_time %>%
+                                   filter(time_to_throw >=  time - .05,
+                                          time_to_throw <= time + .05))$avg_epa
+  }
+  
+  # fitting the model
+  epa_to_eps_model = scam(avg_my_epa ~ s(max_epa_disc, k = 12, bs = "mpi"),
+                          # weights = count,
+                          data = epa_to_eps_per_play_iter)
+
+  
+  max_man_coverage_tracking_iter$eps_tracking_avg = predict(epa_to_eps_model,
+                                                            max_man_coverage_tracking_iter %>%
+                                                         rename(max_epa_disc = epa_pass_attempt_max))
+  
+  max_man_coverage_tracking_iter = max_man_coverage_tracking_iter %>%
+    mutate(eps_tracking_per_play = avg_epa_per_passing_play - eps_tracking_avg)
+  
+  max_man_coverage_tracking_iter_append = max_man_coverage_tracking_iter %>%
+    dplyr::select(gameId, playId, targetNflId, frameId, nflId_def, time_after_snap,
+                  eps_tracking_per_play)
+  
+  if(counter == 0){
+  eps_vals_df_tot = rbind.data.frame(max_man_coverage_tracking_iter_append,
+                          eps_vals_df_tot) %>%
+    arrange(gameId, playId, targetNflId, frameId, nflId_def, time_after_snap)
+  }else{
+    eps_vals_df_tot = rbind(max_man_coverage_tracking_iter_append,
+                                       eps_vals_df_tot) %>%
+      arrange(gameId, playId, targetNflId, frameId, nflId_def, time_after_snap)
+  }
+  
+  counter = counter + 1
+  
+}
+
+max_man_coverage_tracking2 = max_man_coverage_tracking %>%
+  inner_join(eps_vals_df_tot,
+             by = c("gameId", "playId", "targetNflId", "frameId", "nflId_def", 
+                    "time_after_snap" = "time_after_snap")) %>%
+  dplyr::select(-time_after_snap_model)
+
+
+max_man_coverage_tracking2 = max_man_coverage_tracking2 %>%
+  ungroup() %>%
+  group_by(nflId_def, time_after_snap) %>%
   summarise(count = n(),
             avg_max_epa = mean(epa_pass_attempt_max),
-            avg_eps_tracking_per_play = mean(eps_tracking_per_play)) %>%
-  arrange(nflId, time_after_entering_zone)
+            avg_eps_tracking = mean(eps_tracking_per_play)) %>%
+  arrange(nflId_def, time_after_snap) %>%
+  group_by(nflId_def) %>%
+  mutate(max_time_after_snap = max(time_after_snap)) %>%
+  ungroup() 
+
+# max_man_coverage_tracking_filled = max_man_coverage_tracking2 %>%
+#   filter(count >= 10) %>%
+#   ungroup() %>%
+#   complete(nflId_def, time_after_snap)
+# 
+# max_man_coverage_tracking_filled = max_man_coverage_tracking_filled %>%
+#   left_join(max_man_coverage_tracking %>%
+#               rename(count_act = count,
+#                      avg_max_epa_act = avg_max_epa,
+#                      avg_eps_tracking_act = avg_eps_tracking) %>%
+#               dplyr::select(-max_time_after_snap)) %>%
+#   mutate(count = if_else(!is.na(count_act), 
+#                            count_act,
+#                            count),
+#          avg_max_epa = if_else(!is.na(avg_max_epa_act),
+#                                  avg_max_epa_act,
+#                                  avg_max_epa),
+#          avg_eps_tracking = if_else(!is.na(avg_eps_tracking_act),
+#                                     avg_eps_tracking_act,
+#                                avg_eps_tracking)) %>%
+#   dplyr::select(-ends_with("_act"))
+# 
+# max_man_coverage_tracking_filled$count[is.na(max_man_coverage_tracking_filled$count)] = 1
+# 
+# max_man_coverage_tracking_filled = max_man_coverage_tracking_filled %>%
+#   fill(avg_max_epa) %>%
+#   fill(max_time_after_snap) %>%
+#   fill(avg_eps_tracking)
+# 
+# max_man_coverage_tracking_filled = max_man_coverage_tracking_filled %>%
+#   group_by(nflId_def) %>%
+#   filter(sd(avg_max_epa) != 0) %>%
+#   ungroup()
+# 
+# # Fitting a Monotonic Function to Each Player -----------------------------
+# 
+# library(scam)
+# 
+# # Break up d by state, then fit the specified model to each piece and
+# # return a list
+# models <- plyr::dlply(max_man_coverage_tracking_filled, "nflId_def", function(df) 
+#   scam(avg_max_epa ~ s(time_after_snap, k = 15, bs = "mpi"), 
+#        weights = count,
+#        data = df))
+# 
+# # Apply coef to each model and return a data frame
+# fit_by_player = plyr::ldply(models, stats::fitted.values)
+# 
+# fit_by_player2 = fit_by_player %>%
+#   pivot_longer(cols = setdiff(names(fit_by_player), "nflId_def"),
+#                names_to = "time_after_snap_placeholder",
+#                values_to = "avg_max_epa_pred") %>%
+#   group_by(nflId_def) %>%
+#   mutate(time_after_snap = row_number()*.1 + .4) %>%
+#   dplyr::select(-time_after_snap_placeholder)
 
 full_probs_df = full_probs_df %>%
   mutate(cumprob = 1- cumsum(prob),
          cumprob_weights = cumprob/sum(cumprob))
 
-max_zone_coverage_tracking_filled2 = max_zone_coverage_tracking %>%
-  mutate(time_after_entering_zone = as.factor(time_after_entering_zone)) %>%
+fitted_max_man_coverage_tracking2 = max_man_coverage_tracking2 %>%
+  mutate(time_after_snap = as.factor(time_after_snap)) %>%
+  # inner_join(fit_by_player2 %>%
+  #              mutate(time_after_snap = as.factor(time_after_snap))) %>%
   inner_join(full_probs_df %>%
-               mutate(time_after_entering_zone = as.factor(time_after_entering_zone))) %>%
-  ungroup() %>%
-  filter(as.numeric(time_after_entering_zone) >= .5) %>%
-  group_by(nflId) %>%
+               mutate(time_after_snap = as.factor(time_after_snap))) %>%
+  group_by(nflId_def) %>%
   mutate(prob_norm = cumprob_weights/sum(cumprob_weights)) %>%
-  group_by(nflId) %>%
+  group_by(nflId_def) %>%
   summarize(routes = max(count),
             normalized_avg_max_epa = sum(avg_max_epa*prob_norm),
-            eps_tracking_per_play = sum(avg_eps_tracking_per_play*prob_norm)) %>%
+            eps_tracking_per_play = sum(avg_eps_tracking*prob_norm)) %>%
   mutate(eps_tracking = eps_tracking_per_play*routes) %>%
   inner_join(players %>%
                dplyr::select(position, nflId, displayName),
-             by = c("nflId" = "nflId")) %>%
-  dplyr::select(position, displayName, nflId, routes, eps_tracking, eps_tracking_per_play, normalized_avg_max_epa) %>%
+             by = c("nflId_def" = "nflId")) %>%
+  dplyr::select(position, displayName, nflId_def, routes, eps_tracking, eps_tracking_per_play, normalized_avg_max_epa) %>%
   arrange(desc(eps_tracking))
 
 
@@ -325,53 +509,55 @@ tracking_defensive_penalties3 = tracking_defensive_penalties2 %>%
             penalties_eps = -1*penalities_count*avg_epa_penalty) %>%
   arrange(desc(penalities_count))
 
-max_zone_coverage_tracking_filled3 = max_zone_coverage_tracking_filled2 %>%
-  left_join(tracking_defensive_penalties3,
-            by = c("nflId" = "nflId_def")) %>%
-  rename(nflId_def = nflId)
+fitted_max_man_coverage_tracking3 = fitted_max_man_coverage_tracking2 %>%
+  left_join(tracking_defensive_penalties3)
 
-max_zone_coverage_tracking_filled3[is.na(max_zone_coverage_tracking_filled3)] = 0
+fitted_max_man_coverage_tracking3[is.na(fitted_max_man_coverage_tracking3)] = 0
 
-max_zone_coverage_tracking_filled3 = max_zone_coverage_tracking_filled3 %>%
+fitted_max_man_coverage_tracking3 = fitted_max_man_coverage_tracking3 %>%
   mutate(penalties_and_time_to_throw_normalized_tracking_epa = (routes*normalized_avg_max_epa + 
                       penalities_count*avg_epa_penalty)/(routes + penalities_count),
          eps_tracking_w_penalties = eps_tracking + penalties_eps + 
-           (tracking_defensive_penalties_man_avg$avg_penalty_epa_per_route)*(routes + avg_epa_penalty),
+           (tracking_defensive_penalties_man_avg$avg_penalty_epa_per_route)*(routes + penalities_count),
          tracking_penalty_perc = penalities_count/(penalities_count + routes)) %>%
   dplyr::select(position, displayName, nflId_def, routes, eps_tracking_w_penalties, eps_tracking, normalized_avg_max_epa, penalties_and_time_to_throw_normalized_tracking_epa,
                 penalities_count, tracking_penalty_perc, penalties_eps) %>%
   arrange(penalties_and_time_to_throw_normalized_tracking_epa) %>%
-  mutate(qualifying = if_else(routes > 75, 1, 0)) %>%
+  left_join(wr_db_man_matchups %>%
+                       group_by(nflId_def) %>%
+                       summarize(count = n()) %>%
+                       filter(count >= 100) %>%
+                       distinct(nflId_def) %>%
+                       mutate(qualifying = 1)) %>%
+  mutate(qualifying = replace_na(qualifying, 0)) %>%
   dplyr::select(qualifying, everything()) %>%
   arrange(desc(qualifying), desc(eps_tracking_w_penalties))
 
 # getting data for plotting
-player_probs_vs_time = max_zone_coverage_tracking %>%
-  mutate(time_after_entering_zone = as.factor(time_after_entering_zone)) %>%
+player_probs_vs_time = max_man_coverage_tracking2 %>%
+  mutate(time_after_snap = as.factor(time_after_snap)) %>%
   inner_join(players %>%
                dplyr::select(nflId, displayName, position),
-             by = c("nflId" = "nflId")) %>%
-  dplyr::select(position, displayName, nflId, everything()) %>%
-  rename(nflId_def = nflId) %>%
-  left_join(wr_db_zone_matchups_tot %>%
-              group_by(nflId) %>%
+             by = c("nflId_def" = "nflId")) %>%
+  dplyr::select(position, displayName, nflId_def, everything()) %>%
+  left_join(wr_db_man_matchups %>%
+              group_by(nflId_def) %>%
               summarize(count = n()) %>%
               filter(count >= 100) %>%
-              distinct(nflId) %>%
-              mutate(qualifying = 1),
-            by = c("nflId_def" = "nflId")) %>%
+              distinct(nflId_def) %>%
+              mutate(qualifying = 1)) %>%
   mutate(qualifying = replace_na(qualifying, 0)) %>%
   dplyr::select(qualifying, everything()) %>%
   arrange(desc(qualifying), displayName)
 
 # Writing the Data --------------------------------------------------------
 
-write.csv(max_zone_coverage_tracking_filled3,
-          "~/Desktop/CoverageNet/src/05_evaluate_players_zone/outputs/player_tracking_eps.csv",
+write.csv(fitted_max_man_coverage_tracking3,
+          "~/Desktop/CoverageNet/src/04_evaluate_players/outputs/player_tracking_eps.csv",
           row.names = FALSE)
 
 write.csv(player_probs_vs_time,
-          "~/Desktop/CoverageNet/src/05_evaluate_players_zone/outputs/player_tracking_epa_by_time_after_snap.csv",
+          "~/Desktop/CoverageNet/src/04_evaluate_players/outputs/player_tracking_epa_by_time_after_snap.csv",
           row.names = FALSE)
 
 
@@ -471,6 +657,10 @@ route_fitted_max_man_coverage_tracking = route_max_man_coverage_tracking_filled 
                distinct(nflId_def, route) %>%
                ungroup() %>%
                mutate(group = row_number()))
+
+route_fitted_max_man_coverage_tracking = route_fitted_max_man_coverage_tracking %>%
+  group_by(route, nflId_def) %>%
+  filter(sd(avg_max_epa) != 0)
 
 # Break up d by state, then fit the specified model to each piece and
 # return a list

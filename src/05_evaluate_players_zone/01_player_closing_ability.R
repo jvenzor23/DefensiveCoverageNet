@@ -98,8 +98,10 @@ pass_arrived_zone_link = pass_arrived_epa %>%
   rename(nflId_def = nflId,
          nflId_off = targetNflId)
 
-wr_db_zone_matchups = pass_attempt_zone_link %>%
-  inner_join(pass_arrived_zone_link)
+# wr_db_zone_matchups = pass_attempt_zone_link %>%
+#  inner_join(pass_arrived_zone_link)
+
+wr_db_zone_matchups = pass_arrived_zone_link
 
 # Identifying Penalties to Remove -----------------------------------------
 

@@ -26,7 +26,7 @@ games = read.csv("~/Desktop/CoverageNet/inputs/games.csv")
 plays = read.csv("~/Desktop/CoverageNet/inputs/plays.csv")
 targeted_receiver = read.csv("~/Desktop/CoverageNet/inputs/targetedReceiver.csv")
 
-pbp_data = read.csv("~/Desktop/CoverageNet/src/00_data_wrangle/outputs/week3.csv")
+pbp_data = read.csv("~/Desktop/CoverageNet/src/00_data_wrangle/outputs/week14.csv")
 
 epa_tracking_total = read.csv("~/Desktop/CoverageNet/src/03_coverageNet/03_score_tracking/outputs/routes_tracking_epa.csv")
 
@@ -61,8 +61,8 @@ example.play = pbp_data %>%
   inner_join(
     pbp_data %>%
       dplyr::select(gameId, playId) %>%
-      filter(gameId == 2018092309,
-            playId == 138) %>%
+      filter(gameId == 2018120900,
+            playId == 3426) %>%
       distinct()
       # sample_n(1)
   )

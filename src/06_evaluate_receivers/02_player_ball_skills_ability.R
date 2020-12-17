@@ -45,6 +45,7 @@ players = read.csv("~/Desktop/CoverageNet/inputs/players.csv")
 games = read.csv("~/Desktop/CoverageNet/inputs/games.csv")
 plays = read.csv("~/Desktop/CoverageNet/inputs/plays.csv", stringsAsFactors = FALSE)
 targeted_receiver = read.csv("~/Desktop/CoverageNet/inputs/targetedReceiver.csv")
+drops = read.csv("~/Desktop/CoverageNet/src/00_data_wrangle/helper_tables/drops.csv")
 
 wr_db_man_matchups = read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/man_defense_off_coverage_assignments_all_lbs.csv")
 # dropping WRs with double teams
@@ -134,7 +135,8 @@ ball_skills_ability = pass_arrived_epa %>%
   inner_join(plays %>%
                dplyr::select(gameId, playId, passResult)) %>%
   filter(!is.na(targetNflId),
-         !is.na(epa_throw))
+         !is.na(epa_throw)) %>%
+  anti_join(drops)
 
 ball_skills_ability$fitted_epa_pass_throw = lm(epa_throw ~ epa_pass_arrived, data = ball_skills_ability)$fitted.values
 

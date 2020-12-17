@@ -39,20 +39,20 @@ man_zone_classification = rbind(
   read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/all_positions_pass_attempts_man_zone_classes.csv") %>%
     dplyr::select(gameId, playId, nflId, zone_probability),
   read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/all_positions_sacks_man_zone_classes.csv") %>%
-    dplyr::select(gameId, playId, nflId, zone_probability),
-  read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/linebackers_pass_attempts_man_zone_classes.csv") %>%
-    dplyr::select(gameId, playId, nflId, zone_probability),
-  read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/linebackers_sacks_man_zone_classes.csv") %>%
     dplyr::select(gameId, playId, nflId, zone_probability)
 ) %>%
-  arrange(gameId, playId, nflId)
+  arrange(gameId, playId, nflId) %>%
+  distinct(gameId, playId, nflId, .keep_all = TRUE)
+
+man_coverage = read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/man_defense_off_coverage_assignments_all_lbs.csv")
 
 
 # Filtering to Players In Man Coverage ------------------------------------
 
-# we require at least a 50% zone probability to consider a player in zone coverage
+# we take anyone who wasn't identified in man and make them zone
 zone_coverage = man_zone_classification %>%
-  filter(zone_probability >= .5)
+  anti_join(man_coverage,
+            by = c("gameId", "playId", "nflId" = "nflId_def"))
 
 # Identifying Closest Player ----------------------------------------------
 
@@ -117,4 +117,7 @@ for(file in files){
             row.names = FALSE)
   
 }
-    
+  
+
+
+         

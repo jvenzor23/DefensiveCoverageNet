@@ -69,23 +69,23 @@ for(file in files){
   pbp_data2 = pbp_data %>%
     anti_join(pbp_data %>%
                 filter(event == 'qb_spike') %>%
-                select(gameId, playId))
+                dplyr::select(gameId, playId))
   
   # getting rid of error prone plays (approx 3 out of 1032)
   check = pbp_data2 %>%
     group_by(gameId, playId) %>%
     summarize(events = max(time_period)) %>%
     inner_join(plays %>%
-                 select(gameId, playId, passResult))
+                 dplyr::select(gameId, playId, passResult))
   
   clean_plays = check %>%
     filter(events >= 2) %>%
     filter((events == 3)|(passResult == 'S')) %>%
-    select(gameId, playId)
+    dplyr::select(gameId, playId)
   
   pbp_data3 = pbp_data2 %>%
     inner_join(clean_plays) %>%
-    select(-ends_with("_flag"))
+    dplyr::select(-ends_with("_flag"))
   
   pbp_data3_corners = pbp_data3 %>%
     filter(position %in% c('CB', 'DB'))
@@ -98,7 +98,7 @@ for(file in files){
            o_off = o,
            nflId_off = nflId,
            s_off = s) %>%
-    select(gameId, playId, frameId, nflId_off, ends_with("_off"))
+    dplyr::select(gameId, playId, frameId, nflId_off, ends_with("_off"))
   
   pbp_data3_defense = pbp_data3 %>%
     filter(!IsOnOffense) %>%
@@ -107,7 +107,7 @@ for(file in files){
            dir_def = dir,
            o_def = o,
            nflId_def = nflId) %>%
-    select(gameId, playId, frameId, nflId_def, ends_with("_def"))
+    dplyr::select(gameId, playId, frameId, nflId_def, ends_with("_def"))
   
   # Deriving Key Variables --------------------------------------------------
   
@@ -153,14 +153,14 @@ for(file in files){
     mutate(def_off_dist = sqrt((x_def - x_off)^2 + (y_def - y_off)^2)) %>%
     group_by(gameId, playId, frameId, nflId) %>%
     filter(def_off_dist == min(def_off_dist)) %>%
-    select(-ends_with("_def"),
+    dplyr::select(-ends_with("_def"),
            -ends_with("2")) %>%
     inner_join(pbp_data3_defense) %>%
     filter(nflId != nflId_def) %>%
     mutate(cb_def_dist = sqrt((x_def - x)^2 + (y_def - y)^2)) %>%
     group_by(gameId, playId, frameId, nflId) %>%
     filter(cb_def_dist == min(cb_def_dist)) %>%
-    select(-ends_with("_def")) %>%
+    dplyr::select(-ends_with("_def")) %>%
     mutate(ratio = cb_off_dist/def_off_dist) %>%
     mutate(o2 = if_else(o < 0, o + 360, o)) %>%
     mutate(los_o_diff = if_else(abs(270 - o2) < 180,
@@ -175,7 +175,7 @@ for(file in files){
                  filter(event == "ball_snap",
                         is.na(nflId)) %>%
                  distinct(gameId, playId, .keep_all = TRUE) %>%
-                 select(gameId, playId, x, y) %>%
+                 dplyr::select(gameId, playId, x, y) %>%
                  rename(x_snap = x,
                         y_snap = y)) %>%
     mutate(x_rot_45 = (x - x_snap)*cos(pi/4) - (y - y_snap)*sin(pi/4),
@@ -216,6 +216,10 @@ for(file in files){
               off_dir_var = sd(cb_off_dir_diff)^2,
               off_dir_mean = mean(cb_off_dir_diff),
               rat_mean = mean(ratio),
+              rat_min = mean(ratio),
+              rat_25th_quartile = quantile(ratio, .25),
+              rat_50th_quartile = quantile(ratio, .50),
+              rat_75th_quartile = quantile(ratio, .75),
               rat_var = sd(ratio)^2,
               off_o_var = sd(cb_off_o_diff)^2,
               off_o_mean = mean(cb_off_o_diff),
@@ -239,7 +243,7 @@ for(file in files){
                                     cor_y_rot_45, cor_y),
            cor_rot_best_x_y = pmax(cor_avg_x_y, cor_avg_x_y_rot_45)
            ) %>%
-    select(-ends_with("_rot_45"))
+    dplyr::select(-ends_with("_rot_45"))
   
   
   # Splitting into Pass Attempt/Sack Plays ----------------------------------
@@ -247,13 +251,13 @@ for(file in files){
   sack_pbp_data_agg = pbp_data_agg %>%
     inner_join(plays %>%
                  filter(passResult == 'S') %>%
-                 select(gameId, playId)) %>%
+                 dplyr::select(gameId, playId)) %>%
     filter(!grepl('2', time_period_group))
   
   pass_attempt_data_agg = pbp_data_agg %>%
     inner_join(plays %>%
                  filter(passResult != 'S') %>%
-                 select(gameId, playId))
+                 dplyr::select(gameId, playId))
   
   
   # Adding in Event-Measured Variables --------------------------------------
@@ -280,7 +284,7 @@ for(file in files){
   pbp_data_event_variables_midpoint_vals = pbp_data_pre_agg %>%
     inner_join(pbp_data_event_variables_midpoint) %>%
     ungroup() %>%
-    select(gameId, playId, nflId, ratio, cb_off_dir_diff, cb_off_dist) %>%
+    dplyr::select(gameId, playId, nflId, ratio, cb_off_dir_diff, cb_off_dist) %>%
     rename(ratio_between_ball_snap_and_pass_forward = ratio, 
            off_dir_diff_between_ball_snap_and_pass_forward = cb_off_dir_diff,
            off_mean_between_ball_snap_and_pass_forward = cb_off_dist)
@@ -289,9 +293,9 @@ for(file in files){
     anti_join(pbp_data_event_variables %>%
                 filter(event == 'error') %>%
                 ungroup() %>%
-                select(gameId, playId)) %>%
+                dplyr::select(gameId, playId)) %>%
     ungroup() %>%
-    select(gameId, playId, nflId, event, ratio, cb_off_dir_diff, los_o_diff, cb_off_dist) %>%
+    dplyr::select(gameId, playId, nflId, event, ratio, cb_off_dir_diff, los_o_diff, cb_off_dist) %>%
     distinct(gameId, playId, nflId, event, .keep_all = TRUE) %>%
     pivot_wider(names_from = event,
                 values_from = c(ratio, cb_off_dir_diff, los_o_diff, cb_off_dist)) %>%
@@ -308,26 +312,26 @@ for(file in files){
     pivot_wider(names_from = time_period_group,
                 values_from = var_x:cor_rot_best_x_y) %>%
     inner_join(pbp_data_event_variables %>%
-                 select(-ends_with("_sack")))
+                 dplyr::select(-ends_with("_sack")))
   
   pass_attempt_data_agg3 = pass_attempt_data_agg2 %>%
     ungroup() %>%
     drop_na(speed_var_time_0, speed_var_time_1, speed_var_time_2, ratio_pass_forward) %>%
     mutate(week = as.integer(str_split(str_split(file, "week")[[1]][2], ".csv")[[1]][1])) %>%
-    select(week, gameId, playId, nflId, everything())
+    dplyr::select(week, gameId, playId, nflId, everything())
   
   sack_pbp_data_agg2 = sack_pbp_data_agg %>%
     ungroup() %>%
     pivot_wider(names_from = time_period_group,
                 values_from = var_x:cor_rot_best_x_y) %>%
     inner_join(pbp_data_event_variables %>%
-                 select(-ends_with("_pass_forward")))
+                 dplyr::select(-ends_with("_pass_forward")))
   
   sack_pbp_data_agg3 = sack_pbp_data_agg2 %>%
     ungroup() %>%
     drop_na(speed_var_time_0, speed_var_time_1, ratio_qb_sack) %>%
     mutate(week = as.integer(str_split(str_split(file, "week")[[1]][2], ".csv")[[1]][1])) %>%
-    select(week, gameId, playId, nflId, everything())
+    dplyr::select(week, gameId, playId, nflId, everything())
   
 
   # Adding in Correlation Based Variables -----------------------------------
@@ -364,19 +368,19 @@ for(file in files){
     filter(cor_avg == max(cor_avg)) %>%
     ungroup() %>%
     distinct(gameId, playId, nflId, time_period_group, .keep_all = TRUE) %>%
-    select(gameId, playId, nflId, time_period_group, x_cor, y_cor, cor_avg) %>%
+    dplyr::select(gameId, playId, nflId, time_period_group, x_cor, y_cor, cor_avg) %>%
     rename(best_cor_x = x_cor,
            best_cor_y = y_cor,
            best_cor_x_y_avg = cor_avg) %>%
     pivot_wider(names_from = "time_period_group",
                 values_from = best_cor_x:best_cor_x_y_avg) %>%
-    select(-ends_with("ignore"))
+    dplyr::select(-ends_with("ignore"))
 
   pass_attempt_data_agg3 = pass_attempt_data_agg3 %>%
     inner_join(cor_data)
 
   sack_pbp_data_agg3 = sack_pbp_data_agg3 %>%
-    inner_join(cor_data %>% select(-ends_with("_time_2"),
+    inner_join(cor_data %>% dplyr::select(-ends_with("_time_2"),
                                    -ends_with("time_1_2")))
   
   

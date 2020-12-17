@@ -34,31 +34,23 @@ coverages_week1 = read.csv("~/Desktop/CoverageNet/inputs/coverages_week1.csv")
 
 pbp_data = read.csv("~/Desktop/CoverageNet/src/00_data_wrangle/outputs/week1.csv")
 
-zone_coverage = rbind(
+man_zone_classification = rbind(
   read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/all_positions_pass_attempts_man_zone_classes.csv") %>%
     dplyr::select(gameId, playId, nflId, zone_probability),
   read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/all_positions_sacks_man_zone_classes.csv") %>%
-    dplyr::select(gameId, playId, nflId, zone_probability),
-  read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/linebackers_pass_attempts_man_zone_classes.csv") %>%
-    dplyr::select(gameId, playId, nflId, zone_probability),
-  read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/linebackers_sacks_man_zone_classes.csv") %>%
     dplyr::select(gameId, playId, nflId, zone_probability)
 ) %>%
   arrange(gameId, playId, nflId) %>%
-  filter(zone_probability >= .5)
+  distinct(gameId, playId, nflId, .keep_all = TRUE)
+
+man_coverage = read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/man_defense_off_coverage_assignments_all_lbs.csv")
+
+zone_coverage = man_zone_classification %>%
+  anti_join(man_coverage,
+            by = c("gameId", "playId", "nflId" = "nflId_def"))
 
 man_assignments = read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/man_defense_off_coverage_assignments_all_lbs.csv")
 zone_assignments = read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/zone_defense_off_coverage_assignments_all_lbs.csv")
-
-pbp_data = pbp_data %>%
-  inner_join(pbp_data %>%
-               filter(nflId == 2495281) %>%
-               distinct(gameId, playId)) %>%
-  inner_join(zone_coverage %>%
-               filter(nflId == 2495281) %>%
-               distinct(gameId, playId))
-
-
 
 # Making the line segments df ---------------------------------------------
 man_assignments_segment_plt =  rbind(
@@ -165,15 +157,15 @@ man_assignments_segment_plt =  rbind(
 
 
 ## FOR SAFETIES: 2018090912/3849 great example of code working!
-## 2018090910/477 another good one!
+## 2018090910/477 another good one!zone_coverage
 example.play = pbp_data %>%
   inner_join(
     pbp_data %>%
-      dplyr::select(gameId, playId) %>%
-      # filter(gameId == 2018090600,
-      #      playId == 168) %>%
-      # distinct()
-      sample_n(1)
+      # dplyr::select(gameId, playId) %>%
+      filter(gameId == 2018090901,
+           playId == 1912) %>%
+      distinct()
+      # sample_n(1)
   )
 
 example_man_assignments_segment_plt = man_assignments_segment_plt %>%
@@ -182,7 +174,6 @@ example_man_assignments_segment_plt = man_assignments_segment_plt %>%
 
 example_zones = example.play %>%
   inner_join(zone_coverage %>%
-              inner_join(man_assignments) %>%
               distinct(gameId, playId, nflId))
 
 example.play.info = plays %>%
