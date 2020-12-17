@@ -42,9 +42,7 @@ players = read.csv("~/Desktop/CoverageNet/inputs/players.csv", stringsAsFactors 
 games = read.csv("~/Desktop/CoverageNet/inputs/games.csv", stringsAsFactors = FALSE)
 plays = read.csv("~/Desktop/CoverageNet/inputs/plays.csv", stringsAsFactors = FALSE)
 playerImages = read.csv("~/Desktop/CoverageNet/src/00_data_wrangle/helper_tables/playerImages.csv", stringsAsFactors = FALSE)
-
-
-# Joining Player Images to Players ----------------------------------------
+collegeImages = read.csv("~/Desktop/CoverageNet/src/00_data_wrangle/helper_tables/dashboard_college_info.csv", stringsAsFactors = FALSE)
 
 # cleaning names
 players2 = players %>%
@@ -55,6 +53,30 @@ playerImages2 = playerImages %>%
   rename(collegeNameESPN = collegeName,
          positionESPN = position,
          displayNameESPN = displayName)
+
+# Getting Colleges --------------------------------------------------------
+
+college_names_links = players_with_images = players2 %>%
+  left_join(playerImages2) %>%
+  mutate(positionDisc = case_when(grepl("LB", position)|(position %in% c("DE", "DT", "NT")) ~ "DL_LB",
+                                  position %in% c("DB", "CB", 'SS', 'FS', 'S') ~ "DB",
+                                  position %in% c("HB", "RB", "FB", "WR") ~ "OFF_SKILL",
+                                  TRUE ~ position),
+         positionESPNDisc = case_when(grepl("LB", positionESPN)|(positionESPN %in% c("DE", "DT", "NT")) ~ "DL_LB",
+                                      positionESPN %in% c("DB", "CB", 'SS', 'FS', 'S') ~ "DB",
+                                      positionESPN %in% c("HB", "RB", "FB", "WR") ~ "OFF_SKILL",
+                                      positionESPN == "PK" ~ "K",
+                                      TRUE ~ positionESPN)) %>%
+  filter((positionDisc == positionESPNDisc)|(displayName %in% c("Tremon Smith", "Jordan Franks"))) %>%
+  distinct(collegeName, collegeNameESPN) %>%
+  arrange(desc(collegeName)) %>%
+  filter(!((collegeName == "North Dakota State") & (collegeNameESPN == "Utah")),
+         !((collegeName == "Louisiana State") & (collegeNameESPN == "LSU-Shreveport")),
+         !((collegeName == "Georgia Tech") & (collegeNameESPN == "South Carolina")))
+  
+
+# Joining Player Images to Players ----------------------------------------
+
 
 players_with_images = players2 %>%
   left_join(playerImages2) %>%
@@ -154,8 +176,18 @@ player_df_final = players_teams_final %>%
   dplyr::select(-displayName) %>%
   inner_join(players_plays_final) %>%
   left_join(players_with_images %>%
-              dplyr::select(-team)) %>%
-  dplyr::select(displayName, everything())
+              dplyr::select(nflId, playerImageUrl)) %>%
+  left_join(players %>%
+              dplyr::select(displayName, nflId, height, weight, birthDate, collegeName, position)) %>%
+  dplyr::select(displayName, everything()) %>%
+  left_join(college_names_links) %>%
+  mutate(collegeNameESPN = if_else(!is.na(collegeNameESPN),
+                                   collegeNameESPN,
+                                   collegeName)) %>%
+  dplyr::select(-collegeName) %>%
+  rename(collegeName = collegeNameESPN) %>%
+  filter(!grepl("NA", team))
+
 
 write.csv(player_df_final, "~/Desktop/CoverageNet/src/00_data_wrangle/helper_tables/dashboard_player_info.csv")
 

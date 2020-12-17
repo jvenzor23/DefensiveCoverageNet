@@ -82,7 +82,7 @@ skills_table[is.na(skills_table)] = 0
  
 skills_table = skills_table %>% 
   mutate(eps_man_coverage = eps_tracking_w_penalties + eps_saved_closing_w_penalties +
-           eps_saved_ball_skills_w_penalties + eps_tackling,
+           eps_saved_ball_skills_w_penalties + eps_tackling + eps_int_returns,
          eps_man_coverage_no_penalties = eps_tracking + eps_saved_closing + 
            eps_saved_ball_skills + eps_tackling,
          eps_man_coverage_no_tackling = eps_man_coverage - eps_tackling,
@@ -94,7 +94,7 @@ skills_table = skills_table %>%
                 "routes", "targets",
                 "completions", "PB", "interceptions","Tackles", "FF", 
                 "tracking_penalties","closing_penalties","ball_skills_penalties","eps_tracking_w_penalties","eps_saved_closing_w_penalties",
-         "eps_saved_ball_skills_w_penalties","eps_tackling","eps_man_coverage_no_penalties", "eps_man_coverage_no_tackling") %>%
+         "eps_saved_ball_skills_w_penalties","eps_tackling","eps_int_returns", "eps_man_coverage_no_penalties", "eps_man_coverage_no_tackling") %>%
   rename(INT = interceptions,
          T = Tackles,
          completions_allowed = completions,

@@ -59,7 +59,7 @@ pass_arrived_epa = read.csv("~/Desktop/CoverageNet/src/03_coverageNet/01_score_a
          int_prob_pass_arrived = IN_prob)
 
 pass_result_epa = read.csv("~/Desktop/CoverageNet/src/03_coverageNet/00_score_YAC/outputs/yac_yaint_epa_data.csv") %>%
-  dplyr::select(gameId, playId, epa_throw)
+  dplyr::select(gameId, playId, epa_throw, epa_yaint)
 
 dpi_classification = read.csv("~/Desktop/CoverageNet/src/04_evaluate_players/pass_interference_classification/outputs/dpi_classification.csv")
 
@@ -235,13 +235,14 @@ ball_skills_ability2 = ball_skills_ability %>%
             completions_saved = sum(comp_prob_pass_arrived) - sum(passResult == 'C'),
             completions_saved_per_target = completions_saved/targets,
             interceptions_created =  sum(passResult == 'IN') - sum(int_prob_pass_arrived),
-            interceptions_created_per_target = completions_saved/targets,
+            interceptions_created_per_target = interceptions_created/targets,
             expected_epa = sum(epa_pass_arrived),
             actual_epa = sum(epa_throw),
             epa_pass_arrived_avg = mean(epa_pass_arrived),
             epa_result_avg = mean(epa_throw),
             eps_saved_ball_skills = expected_epa - actual_epa,
-            eps_saved_ball_skills_per_target = eps_saved_ball_skills/targets) %>%
+            eps_saved_ball_skills_per_target = eps_saved_ball_skills/targets,
+            eps_int_returns = -1*sum(epa_yaint, na.rm = TRUE)) %>%
   inner_join(players %>%
                dplyr::select(nflId, displayName, position),
              by = c("nflId_def" = "nflId")) %>%
