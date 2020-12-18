@@ -55,21 +55,12 @@ wr_db_man_matchups = wr_db_man_matchups %>%
 #   rename(gameId = game_id,
 #          playId = play_id)
 
-pt_data = read.csv("~/Desktop/CoverageNet/src/00_data_wrangle/outputs/week1.csv")
 my_epa = read.csv("~/Desktop/CoverageNet/src/02_yards_to_epa_function/outputs/plays_with_epa.csv")
 
 plays %>% group_by(penaltyCodes) %>% summarize(count = n()) %>% arrange(desc(count))
 
 player_numbers = read.csv("~/Desktop/CoverageNet/src/00_data_wrangle/helper_tables/player_numbers.csv")
 routes = read.csv("~/Desktop/CoverageNet/src/00_data_wrangle/helper_tables/routes.csv")
-
-check_event = pt_data %>%
-  inner_join(plays) %>%
-  filter(event != "None") %>%
-  distinct(gameId, playId, passResult, event) %>%
-  group_by(passResult, event) %>%
-  summarize(count = n()) %>%
-  arrange(passResult, desc(count))
 
 # Getting Penalties --------------------------------------------------------
 
@@ -256,6 +247,14 @@ max_man_coverage_tracking$eps_tracking_avg = predict(epa_to_eps_model,
 max_man_coverage_tracking = max_man_coverage_tracking %>%
   mutate(eps_tracking_per_play = avg_epa_per_passing_play - eps_tracking_avg)
 
+players_extreme_plays = max_man_coverage_tracking %>%
+  dplyr::select(week, gameId, playId, nflId_def, targetNflId,
+                time_after_snap, eps_tracking_per_play) %>%
+  mutate(eps_tracking_per_play = round(eps_tracking_per_play, 3)) %>%
+  rename(eps = eps_tracking_per_play) %>%
+  arrange(nflId_def, time_after_snap, desc(eps)) %>%
+  filter(time_after_snap %in% c(1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5))
+
 
 max_man_coverage_tracking = max_man_coverage_tracking %>%
   ungroup() %>%
@@ -336,7 +335,10 @@ player_probs_vs_time = max_man_coverage_tracking %>%
               mutate(qualifying = 1)) %>%
   mutate(qualifying = replace_na(qualifying, 0)) %>%
   dplyr::select(qualifying, everything()) %>%
-  arrange(desc(qualifying), displayName)
+  arrange(desc(qualifying), displayName) %>%
+  ungroup() %>%
+  mutate(time_after_snap = as.numeric(as.character(time_after_snap))) %>%
+  filter(time_after_snap <= 6)
 
 # Writing the Data --------------------------------------------------------
 
@@ -345,8 +347,13 @@ write.csv(fitted_max_man_coverage_tracking3,
           row.names = FALSE)
 
 write.csv(player_probs_vs_time,
-          "~/Desktop/CoverageNet/src/04_evaluate_players/outputs/player_tracking_epa_by_time_after_snap.csv",
+          "~/Desktop/CoverageNet/src/04_evaluate_players/outputs/dashboard_player_tracking_eps_by_time_after_snap.csv",
           row.names = FALSE)
+
+write.csv(players_extreme_plays,
+          "~/Desktop/CoverageNet/src/04_evaluate_players/outputs/dashboard_player_tracking_eps_plays_viz.csv",
+          row.names = FALSE)
+
 
 
 # Analysis By Route -------------------------------------------------------

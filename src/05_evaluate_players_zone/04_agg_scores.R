@@ -45,10 +45,9 @@ players = read.csv("~/Desktop/CoverageNet/inputs/players.csv")
 games = read.csv("~/Desktop/CoverageNet/inputs/games.csv")
 plays = read.csv("~/Desktop/CoverageNet/inputs/plays.csv", stringsAsFactors = FALSE)
 
-player_tracking_skills = read.csv("~/Desktop/CoverageNet/src/05_evaluate_players_zone/outputs/player_tracking_eps.csv")
-player_closing_skills = read.csv("~/Desktop/CoverageNet/src/05_evaluate_players_zone/outputs/player_closing_epas.csv")
-player_ball_skills = read.csv("~/Desktop/CoverageNet/src/05_evaluate_players_zone/outputs/player_ball_skills_epas.csv")
-player_tackling_skills = read.csv("~/Desktop/CoverageNet/src/05_evaluate_players_zone/outputs/player_tackling_epas.csv")
+player_closing_skills = read.csv("~/Desktop/CoverageNet/src/05_evaluate_players_zone/outputs/player_closing_eps.csv")
+player_ball_skills = read.csv("~/Desktop/CoverageNet/src/05_evaluate_players_zone/outputs/player_ball_skills_eps.csv")
+player_tackling_skills = read.csv("~/Desktop/CoverageNet/src/05_evaluate_players_zone/outputs/player_tackling_eps.csv")
 
 pass_attempt_epa = read.csv("~/Desktop/CoverageNet/src/03_coverageNet/02_score_attempt/outputs/pass_attempt_epa_data.csv")
 pass_arrived_epa = read.csv("~/Desktop/CoverageNet/src/03_coverageNet/01_score_arrived/outputs/pass_arrived_epa_data.csv")
@@ -70,37 +69,33 @@ on_target_comp_perc = (plays %>%
 
 # Joining the Tables, and Summarizing -------------------------------------
 
-skills_table = player_tracking_skills %>%
-  left_join(player_closing_skills %>%
-              dplyr::select(-targets, -qualifying)) %>%
-  left_join(player_ball_skills %>%
+skills_table = player_closing_skills %>%
+              dplyr::select(-targets, -qualifying) %>%
+  full_join(player_ball_skills %>%
               dplyr::select(-position, -qualifying)) %>%
-  left_join(player_tackling_skills %>%
+  full_join(player_tackling_skills %>%
               dplyr::select(-position, -qualifying))
 
 skills_table[is.na(skills_table)] = 0
  
 skills_table = skills_table %>% 
   mutate(eps_zone_coverage =  eps_saved_closing_w_penalties +
-           eps_saved_ball_skills_w_penalties + eps_tackling + eps_int_returns,
-         eps_zone_coverage_no_penalties = eps_tracking + eps_saved_closing + 
+           eps_saved_ball_skills_w_penalties + eps_tackling + eps_int_returns + eps_ball_hawk,
+         eps_zone_coverage_no_penalties =  eps_saved_closing + 
            eps_saved_ball_skills + eps_tackling,
          eps_zone_coverage_no_tackling = eps_zone_coverage - eps_tackling,
-         eps_per_zone_route = eps_zone_coverage/routes,
-         tracking_penalties = penalities_count,
          closing_penalties = closing_penalties,
          ball_skills_penalties = ball_skills_penalties) %>%
-  dplyr::select("qualifying", "position", "displayName", "nflId_def", "eps_zone_coverage",
-                "routes", "targets",
-                "completions", "PB", "interceptions","Tackles", "FF", 
-                "tracking_penalties","closing_penalties","ball_skills_penalties","eps_saved_closing_w_penalties",
-         "eps_saved_ball_skills_w_penalties","eps_tackling", "eps_int_returns",
+  dplyr::select("position", "displayName", "nflId_def", "eps_zone_coverage","targets",
+                "completions", "PB", "ball_hawk_pbus", "ball_hawk_ints", "interceptions","Tackles", "FF", 
+                "closing_penalties","ball_skills_penalties","eps_saved_closing_w_penalties",
+         "eps_saved_ball_skills_w_penalties","eps_tackling", "eps_int_returns", "eps_ball_hawk",
          "eps_zone_coverage_no_penalties", "eps_zone_coverage_no_tackling") %>%
   rename(INT = interceptions,
          T = Tackles,
          completions_allowed = completions,
          accurate_targets = targets) %>%
-  arrange(desc(qualifying), desc(eps_zone_coverage)) %>%
+  arrange(desc(eps_zone_coverage)) %>%
   filter(!is.na(eps_zone_coverage))
 
 write.csv(skills_table,

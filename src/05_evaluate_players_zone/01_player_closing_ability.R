@@ -192,6 +192,10 @@ closing_ability %>%
   geom_point(aes(x = comp_prob_pass_attempt, y = comp_prob_pass_arrived)) +
   geom_line(aes(x = comp_prob_pass_attempt, y = fitted_comp_prob_pass_arrived), color = "blue")
 
+players_extreme_closing_ability = closing_ability %>%
+  mutate(eps_closing = round(fitted_epa_pass_arrived - epa_pass_arrived, 3)) %>%
+  dplyr::select(gameId, playId, nflId_def, targetNflId, eps_closing) %>%
+  arrange(nflId_def, desc(eps_closing))
 
 # Grouping By Player ------------------------------------------------------
 
@@ -252,7 +256,11 @@ closing_ability3 = closing_ability3 %>%
   arrange(desc(qualifying), desc(eps_saved_closing_w_penalties))
 
 write.csv(closing_ability3,
-          "~/Desktop/CoverageNet/src/05_evaluate_players_zone/outputs/player_closing_epas.csv",
+          "~/Desktop/CoverageNet/src/05_evaluate_players_zone/outputs/player_closing_eps.csv",
+          row.names = FALSE)
+
+write.csv(players_extreme_closing_ability,
+          "~/Desktop/CoverageNet/src/05_evaluate_players_zone/outputs/dashbaord_player_closing_eps_plays_viz.csv",
           row.names = FALSE)
 
 check = wr_db_zone_matchups_tot %>%

@@ -144,6 +144,17 @@ tackles = wr_db_man_matchups %>%
 plays_no_penalties = plays %>%
   filter(penaltyCodes == "")
 
+player_extremes_tackling = pass_result_epa %>%
+  filter(!is.na(epa_yac)) %>%
+  inner_join(targeted_receiver) %>%
+  inner_join(wr_db_man_matchups %>%
+               rename(targetNflId = nflId_off)) %>%
+  inner_join(plays_no_penalties %>%
+               distinct(gameId, playId)) %>%
+  anti_join(fumbles_forced_remove2) %>%
+  mutate(eps_tackling = -1*epa_yac) %>%
+  dplyr::select(gameId, playId, nflId_def, eps_tackling) %>%
+  arrange(nflId_def, desc(eps_tackling))
 
 # Scoring All Plays -------------------------------------------------------
 
@@ -181,6 +192,9 @@ tackling_ability = tackling_ability %>%
   mutate(tackle_perc = Tackles/tackling_opportunities)
 
 write.csv(tackling_ability,
-          "~/Desktop/CoverageNet/src/04_evaluate_players/outputs/player_tackling_epas.csv",
+          "~/Desktop/CoverageNet/src/04_evaluate_players/outputs/player_tackling_eps.csv",
           row.names = FALSE)
-            
+
+write.csv(player_extremes_tackling,
+          "~/Desktop/CoverageNet/src/04_evaluate_players/outputs/dashbaord_player_tackling_eps_plays_viz.csv",
+          row.names = FALSE)

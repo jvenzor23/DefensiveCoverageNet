@@ -46,9 +46,9 @@ games = read.csv("~/Desktop/CoverageNet/inputs/games.csv")
 plays = read.csv("~/Desktop/CoverageNet/inputs/plays.csv", stringsAsFactors = FALSE)
 
 player_tracking_skills = read.csv("~/Desktop/CoverageNet/src/04_evaluate_players/outputs/player_tracking_eps.csv")
-player_closing_skills = read.csv("~/Desktop/CoverageNet/src/04_evaluate_players/outputs/player_closing_epas.csv")
-player_ball_skills = read.csv("~/Desktop/CoverageNet/src/04_evaluate_players/outputs/player_ball_skills_epas.csv")
-player_tackling_skills = read.csv("~/Desktop/CoverageNet/src/04_evaluate_players/outputs/player_tackling_epas.csv")
+player_closing_skills = read.csv("~/Desktop/CoverageNet/src/04_evaluate_players/outputs/player_closing_eps.csv")
+player_ball_skills = read.csv("~/Desktop/CoverageNet/src/04_evaluate_players/outputs/player_ball_skills_eps.csv")
+player_tackling_skills = read.csv("~/Desktop/CoverageNet/src/04_evaluate_players/outputs/player_tackling_eps.csv")
 
 pass_attempt_epa = read.csv("~/Desktop/CoverageNet/src/03_coverageNet/02_score_attempt/outputs/pass_attempt_epa_data.csv")
 pass_arrived_epa = read.csv("~/Desktop/CoverageNet/src/03_coverageNet/01_score_arrived/outputs/pass_arrived_epa_data.csv")
@@ -82,7 +82,7 @@ skills_table[is.na(skills_table)] = 0
  
 skills_table = skills_table %>% 
   mutate(eps_man_coverage = eps_tracking_w_penalties + eps_saved_closing_w_penalties +
-           eps_saved_ball_skills_w_penalties + eps_tackling + eps_int_returns,
+           eps_saved_ball_skills_w_penalties + eps_tackling + eps_int_returns + eps_ball_hawk,
          eps_man_coverage_no_penalties = eps_tracking + eps_saved_closing + 
            eps_saved_ball_skills + eps_tackling,
          eps_man_coverage_no_tackling = eps_man_coverage - eps_tackling,
@@ -92,9 +92,10 @@ skills_table = skills_table %>%
          ball_skills_penalties = ball_skills_penalties) %>%
   dplyr::select("qualifying", "position", "displayName", "nflId_def", "eps_man_coverage",
                 "routes", "targets",
-                "completions", "PB", "interceptions","Tackles", "FF", 
+                "completions", "PB", "ball_hawk_pbus", "interceptions","ball_hawk_ints", "Tackles", "FF", 
                 "tracking_penalties","closing_penalties","ball_skills_penalties","eps_tracking_w_penalties","eps_saved_closing_w_penalties",
-         "eps_saved_ball_skills_w_penalties","eps_tackling","eps_int_returns", "eps_man_coverage_no_penalties", "eps_man_coverage_no_tackling") %>%
+         "eps_saved_ball_skills_w_penalties","eps_tackling","eps_int_returns", "eps_ball_hawk",
+         "eps_man_coverage_no_penalties", "eps_man_coverage_no_tackling") %>%
   rename(INT = interceptions,
          T = Tackles,
          completions_allowed = completions,
