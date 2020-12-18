@@ -73,7 +73,7 @@ college_names_links = players_with_images = players2 %>%
   filter(!((collegeName == "North Dakota State") & (collegeNameESPN == "Utah")),
          !((collegeName == "Louisiana State") & (collegeNameESPN == "LSU-Shreveport")),
          !((collegeName == "Georgia Tech") & (collegeNameESPN == "South Carolina")))
-  
+
 
 # Joining Player Images to Players ----------------------------------------
 
@@ -88,11 +88,11 @@ players_with_images = players2 %>%
                                       positionESPN %in% c("DB", "CB", 'SS', 'FS', 'S') ~ "DB",
                                       positionESPN %in% c("HB", "RB", "FB", "WR") ~ "OFF_SKILL",
                                       positionESPN == "PK" ~ "K",
-                                  TRUE ~ positionESPN)
-         ) %>%
+                                      TRUE ~ positionESPN)
+  ) %>%
   filter((positionDisc == positionESPNDisc)|(displayName %in% c("Tremon Smith", "Jordan Franks"))) %>%
   dplyr::select(displayName, nflId, height, weight, birthDate, collegeName, position,
-         team, playerImageUrl) %>%
+                team, playerImageUrl) %>%
   arrange(displayName)
 
 check = players_with_images %>%
@@ -130,9 +130,9 @@ players_plays_tot = data.frame()
 for(file in files){
   
   pbp_data = read.csv(paste0("~/Desktop/CoverageNet/src/00_data_wrangle/outputs/",
-                            file),
+                             file),
                       stringsAsFactors = FALSE)
-
+  
   players_teams = pbp_data %>%
     filter(!is.na(nflId)) %>%
     inner_join(games) %>%
@@ -197,9 +197,9 @@ write.csv(player_df_final, "~/Desktop/CoverageNet/src/00_data_wrangle/helper_tab
 teams = games %>%
   distinct(homeTeamAbbr) %>%
   rename(teamName = homeTeamAbbr) %>%
-  mutate(teamImageUrl = paste0("https://a.espncdn.com/combiner/i?img=/i/teamlogos/nfl/500/",
+  mutate(teamImageUrl = paste0("https://a.espncdn.com/i/teamlogos/nfl/500/", 
                                str_to_lower(teamName),
-                               ".png&w=40&h=40&cquality=40&scale=crop&location=origin&transparent=true")) %>%
+                               ".png")) %>%
   mutate(division = case_when(teamName %in% c('NE', 'NYJ', 'BUF', 'MIA') ~ 'AFC East',
                               teamName %in% c('CLE', 'PIT', 'BAL', 'CIN') ~ 'AFC North',
                               teamName %in% c('IND', 'JAX', 'TEN', 'HOU') ~ 'AFC South',
