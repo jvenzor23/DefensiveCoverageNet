@@ -87,22 +87,66 @@ skills_table = skills_table %>%
            eps_saved_ball_skills + eps_tackling,
          eps_man_coverage_no_tackling = eps_man_coverage - eps_tackling,
          eps_per_man_route = eps_man_coverage/routes,
-         tracking_penalties = penalities_count,
-         closing_penalties = closing_penalties,
-         ball_skills_penalties = ball_skills_penalties) %>%
-  dplyr::select("qualifying", "position", "displayName", "nflId_def", "eps_man_coverage",
-                "routes", "targets",
-                "completions", "PB", "ball_hawk_pbus", "interceptions","ball_hawk_ints", "Tackles", "FF", 
-                "tracking_penalties","closing_penalties","ball_skills_penalties","eps_tracking_w_penalties","eps_saved_closing_w_penalties",
-         "eps_saved_ball_skills_w_penalties","eps_tackling","eps_int_returns", "eps_ball_hawk",
-         "eps_man_coverage_no_penalties", "eps_man_coverage_no_tackling") %>%
+         penalties_count = tracking_penalities_count + closing_penalties + ball_skills_penalties,
+         penalties_eps = tracking_penalties_eps + closing_penalties_eps + ball_skills_penalties_eps) %>%
+  dplyr::select(-eps_tracking) %>%
+  rename(tracking_penalities = tracking_penalities_count,
+         eps_tracking = eps_tracking_w_penalties,
+         eps_closing = eps_saved_closing_w_penalties,
+         eps_ball_skills = eps_saved_ball_skills_w_penalties) %>%
+  dplyr::select("position", "displayName", "nflId_def", "eps_man_coverage",
+                "routes", "targets","completions", "PB", "ball_hawk_pbus", "interceptions","ball_hawk_ints", "Tackles", "FF", 
+                "penalties_count", "tracking_penalities","closing_penalties","ball_skills_penalties",
+                "penalties_eps", "tracking_penalties_eps", "closing_penalties_eps", "ball_skills_penalties",
+                "eps_tracking","eps_closing","eps_ball_skills","eps_tackling","eps_int_returns", "eps_ball_hawk", 
+                "eps_man_coverage_no_tackling") %>%
   rename(INT = interceptions,
          T = Tackles,
          completions_allowed = completions,
          accurate_targets = targets) %>%
-  arrange(desc(qualifying), desc(eps_man_coverage)) %>%
+  arrange(desc(eps_man_coverage)) %>%
   filter(!is.na(eps_man_coverage))
 
 write.csv(skills_table,
           "~/Desktop/CoverageNet/src/04_evaluate_players/outputs/overall_player_skills_summary.csv",
+          row.names = FALSE)
+
+
+# By Route ----------------------------------------------------------------
+
+route_player_tracking_skills = read.csv("~/Desktop/CoverageNet/src/04_evaluate_players/outputs/player_tracking_eps_by_route.csv")
+route_player_closing_skills = read.csv("~/Desktop/CoverageNet/src/04_evaluate_players/outputs/player_closing_eps_by_route.csv")
+route_player_ball_skills = read.csv("~/Desktop/CoverageNet/src/04_evaluate_players/outputs/player_ball_skills_eps_by_route.csv")
+route_player_tackling_skills = read.csv("~/Desktop/CoverageNet/src/04_evaluate_players/outputs/player_tackling_eps_by_route.csv")
+
+route_skills_table = route_player_tracking_skills %>%
+  left_join(route_player_closing_skills %>%
+              dplyr::select(-targets)) %>%
+  left_join(route_player_ball_skills %>%
+              dplyr::select(-position)) %>%
+  left_join(route_player_tackling_skills %>%
+              dplyr::select(-position))
+
+route_skills_table[is.na(route_skills_table)] = 0
+
+route_skills_table = route_skills_table %>% 
+  mutate(eps_man_coverage = eps_tracking + eps_saved_closing +
+           eps_saved_ball_skills + eps_tackling,
+         eps_man_coverage_no_tackling = eps_man_coverage - eps_tackling,
+         eps_per_man_route = eps_man_coverage/routes) %>%
+  dplyr::select("position", "displayName", "route", "nflId_def", "eps_man_coverage",
+                "routes", "targets",
+                "completions", "PB", "interceptions", "Tackles", "FF",
+                "eps_tracking","eps_saved_closing",
+                "eps_saved_ball_skills","eps_tackling",
+                "eps_man_coverage_no_tackling") %>%
+  rename(INT = interceptions,
+         T = Tackles,
+         completions_allowed = completions,
+         accurate_targets = targets) %>%
+  arrange(route, desc(eps_man_coverage)) %>%
+  filter(!is.na(eps_man_coverage))
+
+write.csv(route_skills_table,
+          "~/Desktop/CoverageNet/src/04_evaluate_players/outputs/overall_player_skills_summary_by_route.csv",
           row.names = FALSE)

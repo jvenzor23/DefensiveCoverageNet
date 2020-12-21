@@ -81,7 +81,6 @@ pass_arrived_frames = read.csv("~/Desktop/CoverageNet/src/03_coverageNet/01_scor
 pass_result_epa = read.csv("~/Desktop/CoverageNet/src/03_coverageNet/00_score_YAC/outputs/yac_yaint_epa_data.csv")
 
 receiver_man_tracking_eps = read.csv("~/Desktop/CoverageNet/src/06_evaluate_receivers/outputs/receiver_man_tracking_eps.csv")
-receiver_zone_tracking_eps = read.csv("~/Desktop/CoverageNet/src/06_evaluate_receivers/outputs/receiver_zone_tracking_eps.csv")
 receiver_ball_skills_eps = read.csv("~/Desktop/CoverageNet/src/06_evaluate_receivers/outputs/receiver_man_ball_skills_eps.csv")
 receiver_closing_eps = read.csv("~/Desktop/CoverageNet/src/06_evaluate_receivers/outputs/receiver_man_closing_eps.csv")
 receiver_tackling_eps = read.csv("~/Desktop/CoverageNet/src/06_evaluate_receivers/outputs/receiver_man_tackling_eps.csv")
@@ -104,26 +103,6 @@ man_tracking_sos2 = man_tracking_sos %>%
   inner_join(players %>%
                dplyr::select(nflId, displayName, position),
              by = c("nflId_def" = "nflId")) %>%
-  dplyr::select(position, displayName, nflId_def, routes, everything()) %>%
-  arrange(desc(routes))
-
-# zone tracking difficulty
-zone_tracking_sos = zone_matchups %>%
-  left_join(receiver_zone_tracking_eps,
-            by = c("targetNflId" = "targetNflId")) %>%
-  dplyr::select(gameId, playId, nflId, eps_per_route)
-
-zone_tracking_sos[is.na(zone_tracking_sos)] = (receiver_zone_tracking_eps %>% filter(is.na(targetNflId)))$eps_per_route
-
-zone_tracking_sos2 = zone_tracking_sos %>%
-  group_by(nflId) %>%
-  summarize(routes = n(),
-            zone_tracking_expected_eps = sum(eps_per_route),
-            zone_tracking_sos = mean(eps_per_route)) %>%
-  inner_join(players %>%
-               dplyr::select(nflId, displayName, position),
-             by = c("nflId" = "nflId")) %>%
-  rename(nflId_def = nflId) %>%
   dplyr::select(position, displayName, nflId_def, routes, everything()) %>%
   arrange(desc(routes))
 
@@ -483,12 +462,9 @@ tackling_sos2 = tackling_sos %>%
 
 # summarizing sos metrics -------------------------------------------------
 
-sos_tot = zone_tracking_sos2 %>%
-  dplyr::select(position, displayName, nflId_def, zone_tracking_expected_eps,
-         zone_tracking_sos) %>%
-  full_join(man_tracking_sos2 %>%
+sos_tot = man_tracking_sos2 %>%
               dplyr::select(position, displayName, nflId_def, man_tracking_expected_eps,
-                     man_tracking_sos)) %>%
+                     man_tracking_sos) %>%
   full_join(closing_sos2 %>%
               dplyr::select(position, displayName, nflId_def, expected_closing_eps_zone,
                             closing_sos_zone, expected_closing_eps_man, closing_sos_man)) %>%
@@ -502,7 +478,7 @@ sos_tot = zone_tracking_sos2 %>%
 sos_tot[is.na(sos_tot)] = 0
 
 sos_tot2 = sos_tot %>%
-  mutate(expected_eps_zone = zone_tracking_expected_eps + expected_closing_eps_zone +
+  mutate(expected_eps_zone = expected_closing_eps_zone +
            expected_ball_skills_eps_zone + expected_tackling_eps_zone,
          expected_eps_man = man_tracking_expected_eps + expected_closing_eps_man +
            expected_ball_skills_eps_man + expected_tackling_eps_man,
@@ -520,8 +496,7 @@ man_ratings = read.csv("~/Desktop/CoverageNet/src/04_evaluate_players//outputs/o
 tot_ratings = zone_ratings %>%
   full_join(man_ratings,
             by = c("position", "displayName", "nflId_def")) %>%
-  rename(eps_tracking_zone = eps_tracking_w_penalties.x,
-         eps_tracking_man = eps_tracking_w_penalties.y,
+  rename(eps_tracking_man = eps_tracking_w_penalties,
          eps_closing_zone = eps_saved_closing_w_penalties.x,
          eps_closing_man = eps_saved_closing_w_penalties.y,
          eps_ball_skills_zone = eps_saved_ball_skills_w_penalties.x,
@@ -531,7 +506,7 @@ tot_ratings = zone_ratings %>%
   mutate(eps_tot = eps_zone_coverage + eps_man_coverage) %>%
   dplyr::select("position", "displayName", "nflId_def",
                 "eps_tot", "eps_zone_coverage","eps_man_coverage",
-                "eps_tracking_zone", "eps_tracking_man",
+                "eps_tracking_man",
                 "eps_closing_zone", "eps_closing_man",
                 "eps_ball_skills_zone","eps_ball_skills_man",
                 "eps_tackling_zone", "eps_tackling_man") %>%
@@ -543,10 +518,22 @@ tot_ratings2 = tot_ratings %>%
   inner_join(sos_tot2) %>%
   mutate(eps_tot_sos_adj = eps_tot - expected_eps_tot,
          eps_zone_sos_adj = eps_zone_coverage - expected_eps_zone,
-         eps_man_sos_adj = eps_man_coverage - expected_eps_man) %>%
+         eps_man_sos_adj = eps_man_coverage - expected_eps_man,
+         eps_zone_closing_sos_adj = eps_closing_zone - expected_closing_eps_zone,
+         eps_zone_ball_skills_sos_adj = eps_ball_skills_zone - expected_ball_skills_eps_zone,
+         eps_zone_tackling_sos_adj = eps_tackling_zone - expected_tackling_eps_zone,
+         eps_man_tracking_sos_adj = eps_tracking_man - man_tracking_expected_eps,
+         eps_man_closing_sos_adj = eps_closing_man - expected_closing_eps_man,
+         eps_man_ball_skills_sos_adj = eps_ball_skills_man - expected_ball_skills_eps_man,
+         eps_man_tackling_sos_adj = eps_tackling_man - expected_tackling_eps_man,
+         ) %>%
   dplyr::select("position", "displayName", "nflId_def",
-                "eps_tot", "eps_zone_coverage","eps_man_coverage",
                 "eps_tot_sos_adj", "eps_zone_sos_adj", "eps_man_sos_adj",
-                everything())
-  
+                ends_with("sos_adj"), contains("expected")) %>%
+  arrange(desc(eps_tot_sos_adj))
+
+
+write.csv(tot_ratings2,
+          "~/Desktop/CoverageNet/src/06_evaluate_receivers/outputs/overall_player_sos_skills_summary.csv",
+          row.names = FALSE)  
 

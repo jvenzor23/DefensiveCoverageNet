@@ -42,6 +42,7 @@ players = read.csv("~/Desktop/CoverageNet/inputs/players.csv")
 games = read.csv("~/Desktop/CoverageNet/inputs/games.csv")
 plays = read.csv("~/Desktop/CoverageNet/inputs/plays.csv", stringsAsFactors = FALSE)
 targeted_receiver = read.csv("~/Desktop/CoverageNet/inputs/targetedReceiver.csv")
+routes = read.csv("~/Desktop/CoverageNet/src/00_data_wrangle/helper_tables/routes.csv")
 
 wr_db_man_matchups = read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/man_defense_off_coverage_assignments_all_lbs.csv")
 wr_db_zone_matchups_tot = read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/zone_defense_off_coverage_assignments_all_lbs.csv")
@@ -229,7 +230,8 @@ closing_ability_penalty = pass_attempt_epa %>%
   mutate(epa_penalty = my_epa - fitted_epa_pass_arrived) %>%
   group_by(nflId_def) %>%
   summarize(closing_penalties = n(),
-            avg_closing_penalties_eps = -1*mean(epa_penalty))
+            avg_closing_penalties_eps = -1*mean(epa_penalty),
+            closing_penalties_eps = -1*sum(epa_penalty))
 
 
 closing_ability3 = closing_ability2 %>%
@@ -242,7 +244,7 @@ closing_ability3 = closing_ability3 %>%
            closing_penalties*avg_closing_penalties_eps)/(avg_closing_penalties_eps + targets),
          eps_saved_closing_w_penalties = eps_saved_closing + closing_penalties*avg_closing_penalties_eps +
            (closing_defensive_penalties_man_avg$avg_penalty_epa_per_target)*(targets + closing_penalties)) %>%
-  dplyr::select(position, displayName, nflId_def, targets, closing_penalties,
+  dplyr::select(position, displayName, nflId_def, targets, closing_penalties,closing_penalties_eps,
                 eps_saved_closing_w_penalties, eps_saved_closing, starts_with("eps_saved"),epa_pass_attempt_avg) %>%
   left_join(wr_db_zone_matchups_tot %>%
               group_by(nflId) %>%
@@ -271,4 +273,26 @@ check = wr_db_zone_matchups_tot %>%
                dplyr::select(nflId, displayName, position)) %>%
   dplyr::select(position, displayName, nflId, everything()) %>%
   arrange(desc(plays_with_zone_covering_wr))
+
+# Breaking Down By Route --------------------------------------------------
+
+routes_closing_ability = closing_ability %>%
+  inner_join(routes, 
+             by = c("gameId", "playId", "targetNflId" = "nflId")) %>%
+  group_by(route, nflId_def) %>%
+  summarize(targets = n(),
+            expected_epa = sum(fitted_epa_pass_arrived),
+            actual_epa = sum(epa_pass_arrived),
+            epa_pass_attempt_avg = mean(epa_pass_attempt),
+            eps_saved_closing = expected_epa - actual_epa,
+            eps_saved_closing_per_target = eps_saved_closing/targets) %>%
+  inner_join(players %>%
+               dplyr::select(nflId, displayName, position),
+             by = c("nflId_def" = "nflId")) %>%
+  dplyr::select(position, displayName, nflId_def, route, targets, eps_saved_closing, eps_saved_closing_per_target) %>%
+  arrange(displayName, desc(eps_saved_closing))
+
+write.csv(routes_closing_ability,
+          "~/Desktop/CoverageNet/src/05_evaluate_players_zone/outputs/player_closing_eps_by_route.csv",
+          row.names = FALSE)
   

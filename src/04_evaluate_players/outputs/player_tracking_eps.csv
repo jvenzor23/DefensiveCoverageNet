@@ -1,4 +1,4 @@
-"qualifying","position","displayName","nflId_def","routes","eps_tracking_w_penalties","eps_tracking","normalized_avg_max_epa","penalties_and_time_to_throw_normalized_tracking_epa","penalities_count","tracking_penalty_perc","penalties_eps"
+"qualifying","position","displayName","nflId_def","routes","eps_tracking_w_penalties","eps_tracking","normalized_avg_max_epa","penalties_and_time_to_throw_normalized_tracking_epa","tracking_penalities_count","tracking_penalty_perc","tracking_penalties_eps"
 1,"CB","Malcolm Butler",2550613,290,7.24982824400441,6.1249046209233,0.0718279168731235,0.0731907417316047,1,0.00343642611683849,-0.468409950691163
 1,"CB","William Jackson",2556367,386,6.40684018448795,4.70265386397463,0.0975071663523953,0.0983287358534844,1,0.00258397932816537,-0.415454563273868
 1,"DB","J.C. Jackson",2560754,159,6.11746271161761,5.55726117700833,0.0148617132674843,0.0167294326063107,1,0.00625,-0.313696807479706

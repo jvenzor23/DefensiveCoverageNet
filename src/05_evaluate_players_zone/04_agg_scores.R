@@ -88,34 +88,24 @@ zone_coverage_cover_counts = wr_db_zone_matchups_tot %>%
   ungroup() %>%
   distinct(gameId, playId, nflId) %>%
   group_by(nflId) %>%
-  summarize(zone_cover_plays = n()) %>%
-  arrange(desc(zone_cover_plays)) %>%
+  summarize(zone_covers = n()) %>%
+  arrange(desc(zone_covers)) %>%
   rename(nflId_def = nflId)
-
-# Getting On Percentage of Throws that Are on Target ---------------------------
-
-perc_throws_on_target = dim(pass_arrived_epa)[1]/dim(pass_attempt_epa)[1]
-
-# Getting On Target Throw Completion Percentage ---------------------------
-
-on_target_comp_perc = (plays %>%
-  inner_join(pass_arrived_epa %>%
-               distinct(gameId, playId)) %>%
-  summarize(comp_perc = mean(passResult == 'C')))$comp_perc
-
-
-
 
 # Joining the Tables, and Summarizing -------------------------------------
 
 skills_table = zone_coverage_counts %>%
+  dplyr::select(-position, -displayName) %>%
   full_join(zone_coverage_cover_counts) %>%
   full_join(player_closing_skills %>%
               dplyr::select(-targets, -qualifying, -displayName, -position)) %>%
   full_join(player_ball_skills %>%
               dplyr::select(-position, -qualifying, -displayName)) %>%
   full_join(player_tackling_skills %>%
-              dplyr::select(-position, -qualifying, -displayName))
+              dplyr::select(-position, -qualifying, -displayName)) %>%
+  inner_join(players %>%
+               dplyr::select(position, displayName, nflId),
+             by = c("nflId_def" = "nflId"))
 
 skills_table[is.na(skills_table)] = 0
  
@@ -125,13 +115,16 @@ skills_table = skills_table %>%
          eps_zone_coverage_no_penalties =  eps_saved_closing + 
            eps_saved_ball_skills + eps_tackling,
          eps_zone_coverage_no_tackling = eps_zone_coverage - eps_tackling,
-         closing_penalties = closing_penalties,
-         ball_skills_penalties = ball_skills_penalties) %>%
-  dplyr::select("position", "displayName", "nflId_def", "eps_zone_coverage","zone_plays", "zone_cover_plays", "targets",
-                "completions", "PB", "ball_hawk_pbus", "ball_hawk_ints", "interceptions","Tackles", "FF", 
-                "closing_penalties","ball_skills_penalties","eps_saved_closing_w_penalties",
-         "eps_saved_ball_skills_w_penalties","eps_tackling", "eps_int_returns", "eps_ball_hawk",
-         "eps_zone_coverage_no_penalties", "eps_zone_coverage_no_tackling") %>%
+         penalties_count =  closing_penalties + ball_skills_penalties,
+         penalties_eps =  closing_penalties_eps + ball_skills_penalties_eps) %>%
+  rename(eps_closing = eps_saved_closing_w_penalties,
+         eps_ball_skills = eps_saved_ball_skills_w_penalties) %>%
+  dplyr::select("position", "displayName", "nflId_def", "eps_zone_coverage",
+                "zone_plays", "zone_covers", "targets","completions", "PB", "ball_hawk_pbus", "interceptions","ball_hawk_ints", "Tackles", "FF", 
+                "penalties_count","closing_penalties","ball_skills_penalties",
+                "penalties_eps", "closing_penalties_eps", "ball_skills_penalties",
+                "eps_closing","eps_ball_skills","eps_tackling","eps_int_returns", "eps_ball_hawk", 
+                "eps_zone_coverage_no_tackling") %>%
   rename(INT = interceptions,
          T = Tackles,
          completions_allowed = completions,
@@ -152,3 +145,43 @@ check2 = skills_table %>%
   dplyr::select("position", "displayName", "nflId_def",
                 "eps_tot", "eps_zone_coverage","eps_man_coverage") %>%
   arrange(desc(eps_tot))
+
+# By Route ----------------------------------------------------------------
+
+route_player_closing_skills = read.csv("~/Desktop/CoverageNet/src/05_evaluate_players_zone/outputs/player_closing_eps_by_route.csv")
+route_player_ball_skills = read.csv("~/Desktop/CoverageNet/src/05_evaluate_players_zone/outputs/player_ball_skills_eps_by_route.csv")
+route_player_tackling_skills = read.csv("~/Desktop/CoverageNet/src/05_evaluate_players_zone/outputs/player_tackling_eps_by_route.csv")
+
+route_skills_table = route_player_closing_skills %>%
+              dplyr::select(-targets, -position, -displayName) %>%
+  full_join(route_player_ball_skills %>%
+              dplyr::select(-position, -displayName)) %>%
+  full_join(route_player_tackling_skills %>%
+              dplyr::select(-position, -displayName)) %>%
+  inner_join(players %>%
+               dplyr::select(position, displayName, nflId),
+             by = c("nflId_def" = "nflId"))
+
+route_skills_table[is.na(route_skills_table)] = 0
+
+route_skills_table = route_skills_table %>% 
+  mutate(eps_zone_coverage =  eps_saved_closing +
+           eps_saved_ball_skills + eps_tackling,
+         eps_zone_coverage_no_tackling = eps_zone_coverage - eps_tackling) %>%
+  dplyr::select("position", "displayName", "route", "nflId_def", "eps_zone_coverage",
+                "targets",
+                "completions", "PB", "interceptions", "Tackles", "FF",
+                "eps_saved_closing",
+                "eps_saved_ball_skills","eps_tackling",
+                "eps_zone_coverage_no_tackling") %>%
+  rename(INT = interceptions,
+         T = Tackles,
+         completions_allowed = completions,
+         accurate_targets = targets) %>%
+  arrange(route, desc(eps_zone_coverage)) %>%
+  filter(!is.na(eps_zone_coverage))
+
+write.csv(route_skills_table,
+          "~/Desktop/CoverageNet/src/05_evaluate_players_zone/outputs/overall_player_skills_summary_by_route.csv",
+          row.names = FALSE)
+

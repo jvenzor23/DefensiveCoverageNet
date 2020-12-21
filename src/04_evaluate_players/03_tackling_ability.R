@@ -45,6 +45,7 @@ players = read.csv("~/Desktop/CoverageNet/inputs/players.csv")
 games = read.csv("~/Desktop/CoverageNet/inputs/games.csv")
 plays = read.csv("~/Desktop/CoverageNet/inputs/plays.csv", stringsAsFactors = FALSE)
 targeted_receiver = read.csv("~/Desktop/CoverageNet/inputs/targetedReceiver.csv")
+routes = read.csv("~/Desktop/CoverageNet/src/00_data_wrangle/helper_tables/routes.csv")
 
 wr_db_man_matchups = read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/man_defense_off_coverage_assignments_all_lbs.csv")
 # dropping WRs with double teams
@@ -58,6 +59,11 @@ dpi_classification = read.csv("~/Desktop/CoverageNet/src/04_evaluate_players/pas
 
 my_epa = read.csv("~/Desktop/CoverageNet/src/02_yards_to_epa_function/outputs/plays_with_epa.csv")
 
+pass_result_frames = read.csv("~/Desktop/CoverageNet/src/03_coverageNet/00_score_YAC/outputs/pass_attempts_all.csv") %>%
+  distinct(gameId, playId, frameId)
+
+closest_pairs = read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/defense_off_closest_players.csv")
+
 
 setwd("~/Desktop/NFL_PBP_DATA/")
 pbp_data_2018 = read_csv("reg_pbp_2018.csv", col_types = cols()) %>%
@@ -67,6 +73,19 @@ pbp_data_2018 = read_csv("reg_pbp_2018.csv", col_types = cols()) %>%
                 assist_tackle_3_player_name, assist_tackle_4_player_name) %>%
   rename(gameId = game_id,
          playId = play_id)
+
+# Creating WR/DB zone links across time frames ------------------------------
+
+tackling_matchups = pass_result_epa %>%
+  inner_join(pass_result_frames) %>%
+  inner_join(targeted_receiver) %>%
+  inner_join(closest_pairs,
+             by = c("gameId", "playId", "targetNflId" = "nflId_opp")) %>%
+  filter(frameId >= frameId_start,
+         frameId <= frameId_end) %>%
+  dplyr::select(gameId, playId, nflId, targetNflId) %>%
+  rename(nflId_def = nflId,
+         nflId_off = targetNflId)
 
 # Identifying Fumbles Forced to Remove -------------------------------------
 
@@ -100,6 +119,7 @@ fumbles_forced_remove2 = fumbles_forced_remove %>%
   filter(!is_player)
 
 fumbles_forced = fumbles_forced_remove %>%
+  inner_join(tackling_matchups) %>%
   filter(is_player) %>%
   group_by(nflId_def) %>%
   summarize(FF = n())
@@ -107,6 +127,7 @@ fumbles_forced = fumbles_forced_remove %>%
 tackles = wr_db_man_matchups %>%
   inner_join(targeted_receiver,
              by = c("gameId", "playId", "nflId_off" = "targetNflId")) %>%
+  inner_join(tackling_matchups) %>%
   inner_join(plays %>%
                filter(passResult %in% c("C"),
                       penaltyCodes == "") %>%
@@ -156,8 +177,10 @@ player_extremes_tackling = pass_result_epa %>%
   dplyr::select(gameId, playId, nflId_def, eps_tackling) %>%
   arrange(nflId_def, desc(eps_tackling))
 
+
 # Scoring All Plays -------------------------------------------------------
 
+# removes ~15% of tackling observations
 tackling_ability = pass_result_epa %>%
   filter(!is.na(epa_yac)) %>%
   inner_join(targeted_receiver) %>%
@@ -166,6 +189,7 @@ tackling_ability = pass_result_epa %>%
   inner_join(plays_no_penalties %>%
                distinct(gameId, playId)) %>%
   anti_join(fumbles_forced_remove2) %>%
+  inner_join(tackling_matchups) %>%
   group_by(nflId_def) %>%
   summarize(tackling_opportunities = n(),
             eps_tackling = -1*sum(epa_yac),
@@ -198,3 +222,81 @@ write.csv(tackling_ability,
 write.csv(player_extremes_tackling,
           "~/Desktop/CoverageNet/src/04_evaluate_players/outputs/dashbaord_player_tackling_eps_plays_viz.csv",
           row.names = FALSE)
+
+
+# By Route ----------------------------------------------------------------
+
+routes_fumbles_forced = fumbles_forced_remove %>%
+  inner_join(tackling_matchups) %>%
+  inner_join(routes, 
+             by = c("gameId", "playId", "nflId_off" = "nflId")) %>%
+  filter(is_player) %>%
+  group_by(route, nflId_def) %>%
+  summarize(FF = n())
+
+routes_tackles = wr_db_man_matchups %>%
+  inner_join(targeted_receiver,
+             by = c("gameId", "playId", "nflId_off" = "targetNflId")) %>%
+  inner_join(tackling_matchups) %>%
+  inner_join(routes, 
+             by = c("gameId", "playId", "nflId_off" = "nflId")) %>%
+  inner_join(plays %>%
+               filter(passResult %in% c("C"),
+                      penaltyCodes == "") %>%
+               distinct(gameId, playId)) %>%
+  inner_join(players %>%
+               dplyr::select(nflId, displayName) %>%
+               rename(nflId_def = nflId)) %>%
+  left_join(pbp_data_2018) %>%
+  separate(displayName, into = c("first", "rest"), sep = "\\s",
+           extra = "merge") %>%
+  mutate(displayNameNew = paste0(substring(first, 1, 1), ".",
+                                 rest)) %>%
+  mutate(displayNameNew = case_when(displayNameNew == "S.Griffin" ~ "SL.Griffin",
+                                    displayNameNew == "H.Ha Clinton-Dix" ~ "H.Clinton-Dix",
+                                    displayNameNew ==  "B.Williams" ~ "Bra.Williams",
+                                    displayNameNew == "C.Davis" ~ "C.Davis III",
+                                    displayNameNew == "D.Harris" ~ "Dev.Harris",
+                                    TRUE ~ displayNameNew)) %>%
+  rowwise() %>%
+  mutate(is_solo = replace_na(grepl(str_to_lower(solo_tackle_1_player_name), str_to_lower(displayNameNew)), FALSE),
+         is_assist = replace_na(grepl(str_to_lower(assist_tackle_1_player_name), str_to_lower(displayNameNew)), FALSE)|
+           replace_na(grepl(str_to_lower(assist_tackle_2_player_name), str_to_lower(displayNameNew)), FALSE)|
+           replace_na(grepl(str_to_lower(assist_tackle_3_player_name), str_to_lower(displayNameNew)), FALSE)|
+           replace_na(grepl(str_to_lower(assist_tackle_4_player_name), str_to_lower(displayNameNew)), FALSE)) %>%
+  group_by(route, nflId_def) %>%
+  summarize(Tackles = sum(1*is_solo) + .5*sum(1*is_assist))
+
+routes_tackling = pass_result_epa %>%
+  filter(!is.na(epa_yac)) %>%
+  inner_join(targeted_receiver) %>%
+  inner_join(wr_db_man_matchups %>%
+               rename(targetNflId = nflId_off)) %>%
+  inner_join(plays_no_penalties %>%
+               distinct(gameId, playId)) %>%
+  anti_join(fumbles_forced_remove2) %>%
+  inner_join(tackling_matchups) %>%
+  inner_join(routes, 
+             by = c("gameId", "playId", "targetNflId" = "nflId")) %>%
+  group_by(route, nflId_def) %>%
+  summarize(tackling_opportunities = n(),
+            eps_tackling = -1*sum(epa_yac),
+            eps_per_tackling_opportunity = -1*mean(epa_yac),
+            perc_reduce_yac = mean(epa_yac < 0)) %>%
+  left_join(routes_fumbles_forced) %>%
+  left_join(routes_tackles) %>%
+  inner_join(players %>%
+               dplyr::select(nflId, displayName, position),
+             by = c("nflId_def" = "nflId")) %>%
+  dplyr::select(position, displayName, nflId_def, route, everything()) %>%
+  arrange(displayName, route, desc(eps_tackling))
+
+routes_tackling[is.na(routes_tackling)] = 0
+
+
+write.csv(routes_tackling,
+          "~/Desktop/CoverageNet/src/04_evaluate_players/outputs/player_tackling_eps_by_route.csv",
+          row.names = FALSE)
+
+
+

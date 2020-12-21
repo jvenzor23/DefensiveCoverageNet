@@ -46,6 +46,7 @@ games = read.csv("~/Desktop/CoverageNet/inputs/games.csv")
 plays = read.csv("~/Desktop/CoverageNet/inputs/plays.csv", stringsAsFactors = FALSE)
 targeted_receiver = read.csv("~/Desktop/CoverageNet/inputs/targetedReceiver.csv")
 drops = read.csv("~/Desktop/CoverageNet/src/00_data_wrangle/helper_tables/drops.csv")
+routes = read.csv("~/Desktop/CoverageNet/src/00_data_wrangle/helper_tables/routes.csv")
 
 wr_db_man_matchups = read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/man_defense_off_coverage_assignments_all_lbs.csv")
 # dropping WRs with double teams
@@ -64,6 +65,12 @@ pass_arrived_epa = read.csv("~/Desktop/CoverageNet/src/03_coverageNet/01_score_a
 
 pass_result_epa = read.csv("~/Desktop/CoverageNet/src/03_coverageNet/00_score_YAC/outputs/yac_yaint_epa_data.csv") %>%
   dplyr::select(gameId, playId, epa_throw, epa_yaint)
+
+pass_arrived_frames = read.csv("~/Desktop/CoverageNet/src/03_coverageNet/01_score_arrived/outputs/pass_attempts_with_fumbles.csv") %>%
+  distinct(gameId, playId, frameId)
+
+closest_pairs = read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/defense_off_closest_players.csv")
+
 
 dpi_classification = read.csv("~/Desktop/CoverageNet/src/04_evaluate_players/pass_interference_classification/outputs/dpi_classification.csv")
 
@@ -200,9 +207,23 @@ ball_skills_defensive_penalties_man_avg = (ball_skills_defensive_penalties_score
                                                          inner_join(wr_db_man_matchups,
                                                                    by = c("gameId", "playId", "targetNflId" = "nflId_off")) %>%
                                                                       distinct(gameId, playId))[1])
+# Finding Closest Player at Arrival ---------------------------------------
+
+pass_arrived_closest_link = pass_arrived_epa %>%
+  inner_join(pass_arrived_frames) %>%
+  inner_join(targeted_receiver) %>%
+  inner_join(closest_pairs,
+             by = c("gameId", "playId", "targetNflId" = "nflId_opp")) %>%
+  filter(frameId >= frameId_start,
+         frameId <= frameId_end) %>%
+  dplyr::select(gameId, playId, nflId, targetNflId) %>%
+  rename(nflId_def = nflId,
+         nflId_off = targetNflId)
+
 
 # Joining the Data --------------------------------------------------------
 
+# removes ~10% of observations
 ball_skills_ability = pass_arrived_epa %>%
   inner_join(pass_result_epa) %>%
   anti_join(interceptions_incompletions_remove2) %>%
@@ -212,8 +233,10 @@ ball_skills_ability = pass_arrived_epa %>%
   filter(!is.na(targetNflId),
          !is.na(epa_throw)) %>%
   inner_join(wr_db_man_matchups %>%
-               rename(targetNflId = nflId_off)) %>%
-  anti_join(drops)
+               rename(targetNflId = nflId_off))  %>%
+  anti_join(drops) %>%
+  inner_join(pass_arrived_closest_link %>%
+              distinct(gameId, playId, nflId_def))
 
 ball_skills_ability$fitted_epa_pass_throw = lm(epa_throw ~ epa_pass_arrived, data = ball_skills_ability)$fitted.values
 
@@ -422,7 +445,8 @@ ball_skills_penalty = ball_skills_defensive_penalties_score %>%
   mutate(epa_penalty = my_epa - mean(pass_arrived_epa$epa_pass_arrived)) %>%
   group_by(nflId_def) %>%
   summarize(ball_skills_penalties = n(),
-            avg_ball_skills_penalties_eps = -1*mean(epa_penalty))
+            avg_ball_skills_penalties_eps = -1*mean(epa_penalty),
+            ball_skills_penalties_eps = -1*sum(epa_penalty))
 
 
 ball_skills_ability3 = ball_skills_ability2 %>%
@@ -457,4 +481,44 @@ write.csv(player_extremes_ball_hawk,
 write.csv(player_extremes_int_returns,
           "~/Desktop/CoverageNet/src/04_evaluate_players/outputs/dashbaord_player_int_returns_eps_plays_viz.csv",
           row.names = FALSE)
+
+# Breaking Down By Route --------------------------------------------------
+
+pbus = interceptions_incompletions_remove %>%
+  inner_join(routes, 
+             by = c("gameId", "playId", "nflId_off" = "nflId")) %>%
+  filter(is_player & is.na(interception_player_name)) %>%
+  group_by(route, nflId_def) %>%
+  summarize(PB = n())
+
+routes_ball_skills_ability = ball_skills_ability %>%
+  inner_join(routes, 
+             by = c("gameId", "playId", "targetNflId" = "nflId")) %>%
+  group_by(route, nflId_def) %>%
+  summarize(targets = n(),
+            completions = sum(passResult == 'C'),
+            interceptions = sum(passResult == 'IN'),
+            expected_epa = sum(epa_pass_arrived),
+            actual_epa = sum(epa_throw),
+            epa_pass_arrived_avg = mean(epa_pass_arrived),
+            epa_result_avg = mean(epa_throw),
+            eps_saved_ball_skills = expected_epa - actual_epa,
+            eps_saved_ball_skills_per_target = eps_saved_ball_skills/targets) %>%
+  inner_join(players %>%
+               dplyr::select(nflId, displayName, position),
+             by = c("nflId_def" = "nflId")) %>%
+  dplyr::select(position, displayName, nflId_def, route, targets, 
+                completions, interceptions, eps_saved_ball_skills, eps_saved_ball_skills_per_target) %>%
+  arrange(displayName, route, desc(eps_saved_ball_skills))
+
+routes_ball_skills_ability2 = routes_ball_skills_ability %>%
+  left_join(pbus)
+
+routes_ball_skills_ability2[is.na(routes_ball_skills_ability2)] = 0  
+
+
+write.csv(routes_ball_skills_ability2,
+          "~/Desktop/CoverageNet/src/04_evaluate_players/outputs/player_ball_skills_eps_by_route.csv",
+          row.names = FALSE)
+
 
