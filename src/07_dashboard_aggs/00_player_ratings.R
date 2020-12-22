@@ -113,7 +113,7 @@ overall_table = overall_table %>%
   inner_join(player_info %>%
                rename(nflId_def = nflId)) %>%
   inner_join(man_zone_perc) %>%
-  dplyr::select(Pos, Player,  G, `Pass Snaps`, `%Man`,
+  dplyr::select(nflId_def, Pos, Player,  G, `Pass Snaps`, `%Man`,
                 EPS, `Man EPS`, `Zone EPS`,
                 `SOS EPS`, `SOS Man EPS`, `SOS Zone EPS`,
                 Covers, `Accurate TAR`, C, INT, `Ball Hawk INT`,
@@ -177,7 +177,7 @@ man_overall_table = man_overall_table %>%
   inner_join(player_info %>%
                rename(nflId_def = nflId)) %>%
   inner_join(man_zone_perc) %>%
-  dplyr::select(Pos, Player,  G, `Pass Snaps`, `%Man`,
+  dplyr::select(nflId_def, Pos, Player,  G, `Pass Snaps`, `%Man`,
                 `Man EPS`,`Man EPS Tracking`, `Man EPS Closing`,
                 `Man EPS Ball Skills`, `Man EPS Tackling`, 
                 `Man EPS Ball Hawk`, `Man EPS INT Returns`,
@@ -243,7 +243,7 @@ zone_overall_table = zone_overall_table %>%
                rename(nflId_def = nflId)) %>%
   inner_join(man_zone_perc) %>%
   mutate(`%Zone` = 1 - `%Man`) %>%
-  dplyr::select(Pos, Player,  G, `Pass Snaps`, `%Zone`,
+  dplyr::select(nflId_def, Pos, Player,  G, `Pass Snaps`, `%Zone`,
                 `Zone EPS`, `Zone EPS Closing`,
                 `Zone EPS Ball Skills`, `Zone EPS Tackling`, 
                 `Zone EPS Ball Hawk`, `Zone EPS INT Returns`,
@@ -257,4 +257,3 @@ zone_overall_table = zone_overall_table %>%
 write.csv(zone_overall_table,
           "~/Desktop/CoverageNet/src/07_dashboard_aggs/outputs/player_ratings/player_ratings_zone.csv",
           row.names = FALSE)
-
