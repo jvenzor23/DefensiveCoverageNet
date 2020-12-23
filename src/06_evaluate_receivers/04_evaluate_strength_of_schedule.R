@@ -496,11 +496,11 @@ man_ratings = read.csv("~/Desktop/CoverageNet/src/04_evaluate_players//outputs/o
 tot_ratings = zone_ratings %>%
   full_join(man_ratings,
             by = c("position", "displayName", "nflId_def")) %>%
-  rename(eps_tracking_man = eps_tracking_w_penalties,
-         eps_closing_zone = eps_saved_closing_w_penalties.x,
-         eps_closing_man = eps_saved_closing_w_penalties.y,
-         eps_ball_skills_zone = eps_saved_ball_skills_w_penalties.x,
-         eps_ball_skills_man = eps_saved_ball_skills_w_penalties.y,
+  rename(eps_tracking_man = eps_tracking,
+         eps_closing_zone = eps_closing.x,
+         eps_closing_man = eps_closing.y,
+         eps_ball_skills_zone = eps_ball_skills.x,
+         eps_ball_skills_man = eps_ball_skills.y,
          eps_tackling_zone = eps_tackling.x,
          eps_tackling_man = eps_tackling.y) %>%
   mutate(eps_tot = eps_zone_coverage + eps_man_coverage) %>%

@@ -74,7 +74,7 @@ skills_table = player_tracking_skills %>%
   left_join(player_closing_skills %>%
               dplyr::select(-targets)) %>%
   left_join(player_ball_skills %>%
-              dplyr::select(-position)) %>%
+              dplyr::select(-position, -routes)) %>%
   left_join(player_tackling_skills %>%
               dplyr::select(-position))
 

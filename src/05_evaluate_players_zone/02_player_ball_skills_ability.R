@@ -397,6 +397,17 @@ player_extremes_int_returns = rbind(ball_skills_ability %>%
   dplyr::select(-epa_yaint) %>%
   arrange(nflId_def, desc(eps_yaint))
 
+avg_ball_hawk_per_route = (sum(ball_hawk_stats$ball_hawk_ints_eps) + 
+                             sum(ball_hawk_stats$ball_hawk_pbus_eps))/
+  dim(zone_coverage_plays)[1]
+
+expected_ball_hawk_eps = zone_coverage_plays %>%
+  rename(nflId_def = nflId) %>%
+  group_by(nflId_def) %>%
+  summarize(routes = n()) %>%
+  mutate(e_ball_hawk_eps = routes*avg_ball_hawk_per_route)
+
+
 # Grouping By Player ------------------------------------------------------
 
 ball_skills_ability2 = ball_skills_ability %>%
@@ -461,6 +472,7 @@ ball_skills_ability3 = ball_skills_ability2 %>%
 ball_skills_ability3[is.na(ball_skills_ability3)] = 0  
 
 ball_skills_ability3 = ball_skills_ability3 %>%
+  inner_join(expected_ball_hawk_eps) %>%
   mutate(eps_int_returns = eps_int_returns + ball_hawk_eps_int_returns) %>%
   mutate(eps_saved_ball_skills_per_target_w_penalties = (eps_saved_ball_skills_per_target*targets + 
                                                       ball_skills_penalties*avg_ball_skills_penalties_eps)/(ball_skills_penalties + targets),
@@ -468,7 +480,7 @@ ball_skills_ability3 = ball_skills_ability3 %>%
            ball_skills_defensive_penalties_man_avg*(ball_skills_penalties + targets),
          hands_on_ball_plays = interceptions + PB,
          hands_on_ball_rate = hands_on_ball_plays/(targets + ball_skills_penalties),
-         eps_ball_hawk = ball_hawk_ints_eps + ball_hawk_pbus_eps) %>%
+         eps_ball_hawk = ball_hawk_ints_eps + ball_hawk_pbus_eps - e_ball_hawk_eps) %>%
   arrange(desc(qualifying), desc(eps_saved_ball_skills_w_penalties))
 
 write.csv(ball_skills_ability3,

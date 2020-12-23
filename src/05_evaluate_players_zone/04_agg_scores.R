@@ -100,7 +100,7 @@ skills_table = zone_coverage_counts %>%
   full_join(player_closing_skills %>%
               dplyr::select(-targets, -qualifying, -displayName, -position)) %>%
   full_join(player_ball_skills %>%
-              dplyr::select(-position, -qualifying, -displayName)) %>%
+              dplyr::select(-position, -qualifying, -displayName, -routes)) %>%
   full_join(player_tackling_skills %>%
               dplyr::select(-position, -qualifying, -displayName)) %>%
   inner_join(players %>%
