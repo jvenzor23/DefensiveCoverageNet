@@ -155,6 +155,7 @@ epa_to_eps_per_play = epa_tracking_total_penalties_removed %>%
   arrange(max_epa_disc) %>%
   filter(count >= 50)
 
+library(scam)
 fitted.values = scam(avg_my_epa ~ s(max_epa_disc, k = 10, bs = "mpi"),
                      # weights = count,
                      data = epa_to_eps_per_play)$fitted.values
@@ -185,6 +186,17 @@ epa_to_eps_per_play2 %>%
   ggplot() +
   geom_line(aes(x =max_epa_disc, y = fitted_avg_eps), color = "blue")
 
+# Getting Man Coverage Win Rates ------------------------------------------
+
+man_cov_win_rate = epa_tracking_total_penalties_removed %>%
+  inner_join(wr_db_man_matchups,
+             by = c("gameId", "playId", "targetNflId" = "nflId_off")) %>%
+  group_by(gameId, playId, nflId_def) %>%
+  mutate(time_after_snap = (5 + (frameId - min(frameId)))*.1) %>%
+  filter(time_after_snap == 2.5) %>%
+  group_by(nflId_def) %>%
+  summarize(count = n(),
+            man_tracking_win_rate = mean(epa_pass_attempt < avg_epa_per_passing_play))
 
 # Getting Throw Time Dist -------------------------------------------------
 
@@ -297,7 +309,8 @@ tracking_defensive_penalties3 = tracking_defensive_penalties2 %>%
   arrange(desc(tracking_penalities_count))
 
 fitted_max_man_coverage_tracking3 = fitted_max_man_coverage_tracking2 %>%
-  left_join(tracking_defensive_penalties3)
+  left_join(tracking_defensive_penalties3) %>%
+  left_join(man_cov_win_rate)
 
 fitted_max_man_coverage_tracking3[is.na(fitted_max_man_coverage_tracking3)] = 0
 
@@ -308,7 +321,7 @@ fitted_max_man_coverage_tracking3 = fitted_max_man_coverage_tracking3 %>%
            (tracking_defensive_penalties_man_avg$avg_penalty_epa_per_route)*(routes + avg_epa_penalty),
          tracking_penalty_perc = tracking_penalities_count/(tracking_penalities_count + routes)) %>%
   dplyr::select(position, displayName, nflId_def, routes, eps_tracking_w_penalties, eps_tracking, normalized_avg_max_epa, penalties_and_time_to_throw_normalized_tracking_epa,
-                tracking_penalities_count, tracking_penalty_perc, tracking_penalties_eps) %>%
+                tracking_penalities_count, tracking_penalty_perc, tracking_penalties_eps, man_tracking_win_rate) %>%
   arrange(penalties_and_time_to_throw_normalized_tracking_epa) %>%
   left_join(wr_db_man_matchups %>%
               group_by(nflId_def) %>%

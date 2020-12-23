@@ -99,7 +99,7 @@ skills_table = skills_table %>%
                 "penalties_count", "tracking_penalities","closing_penalties","ball_skills_penalties",
                 "penalties_eps", "tracking_penalties_eps", "closing_penalties_eps", "ball_skills_penalties",
                 "eps_tracking","eps_closing","eps_ball_skills","eps_tackling","eps_int_returns", "eps_ball_hawk", 
-                "eps_man_coverage_no_tackling") %>%
+                "eps_man_coverage_no_tackling", "man_tracking_win_rate") %>%
   rename(INT = interceptions,
          T = Tackles,
          completions_allowed = completions,

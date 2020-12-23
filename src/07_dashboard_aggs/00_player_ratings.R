@@ -145,7 +145,7 @@ man_overall_table = man_ratings %>%
                 eps_ball_skills, eps_tackling, eps_int_returns, eps_ball_hawk,
                 routes, accurate_targets, completions_allowed,
                 PB, ball_hawk_pbus, INT, ball_hawk_ints, T, FF, penalties_count,
-                penalties_eps) %>%
+                penalties_eps, man_tracking_win_rate) %>%
   rename(man_routes = routes,
          man_accurate_targets = accurate_targets,
          man_completions_allowed = completions_allowed,
@@ -163,7 +163,8 @@ man_overall_table = man_ratings %>%
          `Man EPS Ball Skills` = eps_ball_skills,
          `Man EPS Tackling` = eps_tackling,
          `Man EPS Ball Hawk` = eps_ball_hawk,
-         `Man EPS INT Returns` = eps_int_returns) %>%
+         `Man EPS INT Returns` = eps_int_returns,
+         `Man Tracking Win Rate` = man_tracking_win_rate) %>%
   dplyr::select(nflId_def, `Man EPS`, starts_with("man")) %>%
   full_join(sos_ratings %>%
               rename(`SOS Man EPS` = eps_man_sos_adj,
@@ -203,13 +204,14 @@ man_overall_table = man_overall_table %>%
                 INT, `Ball Hawk INT`, PB, `Ball Hawk PB`, 
                 `Hands on Ball % of Targets`,
                 `Hands on Ball % of Plays`,
-                T, FF, Penalties) %>%
+                T, FF, Penalties, `Man Tracking Win Rate`) %>%
   arrange(desc(`Man EPS`)) %>%
   dplyr::mutate_if(is.numeric, round, digits=4) %>%
   mutate(`%Man` = scales::percent(`%Man`, accuracy = .1),
          `Targeted C%` = scales::percent(`Targeted C%`, accuracy = .1),
          `Hands on Ball % of Targets` = scales::percent(`Hands on Ball % of Targets`, accuracy = .1),
-         `Hands on Ball % of Plays` = scales::percent(`Hands on Ball % of Plays`, accuracy = .1)) %>%
+         `Hands on Ball % of Plays` = scales::percent(`Hands on Ball % of Plays`, accuracy = .1),
+         `Man Tracking Win Rate` = scales::percent(`Man Tracking Win Rate`, accuracy = .1)) %>%
   dplyr::mutate_if(is.numeric, round, digits=2)
 
 write.csv(man_overall_table,
