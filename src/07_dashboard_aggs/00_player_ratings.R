@@ -98,6 +98,8 @@ overall_table = man_ratings %>%
 overall_table[is.na(overall_table)] = 0
 
 overall_table = overall_table %>%
+  inner_join(player_info %>%
+               rename(nflId_def = nflId)) %>%
   mutate(EPS = `Man EPS` + `Zone EPS`,
          `EPS Penalties` = man_penalties_eps + zone_penalties_eps,
          Covers = man_routes + zone_covers,
@@ -109,17 +111,27 @@ overall_table = overall_table %>%
          `Ball Hawk PB` = man_ball_hawk_pbus + zone_ball_hawk_pbus,
          T = man_T + zone_T,
          FF = man_FF + zone_FF,
-         Penalties = man_penalties + zone_penalties) %>%
-  inner_join(player_info %>%
-               rename(nflId_def = nflId)) %>%
+         Penalties = man_penalties + zone_penalties,
+         `Targeted C%` = replace_na(C/`Accurate TAR`, 0),
+         `Hands on Ball % of Targets` = replace_na((INT + PB)/`Accurate TAR`, 0),
+         `Hands on Ball % of Plays` = replace_na((INT + `Ball Hawk INT` +
+                                         PB + `Ball Hawk PB`)/`Pass Snaps`, 0)) %>%
   inner_join(man_zone_perc) %>%
   dplyr::select(nflId_def, Pos, Player,  G, `Pass Snaps`, `%Man`,
                 EPS, `Man EPS`, `Zone EPS`,
                 `SOS EPS`, `SOS Man EPS`, `SOS Zone EPS`,
-                Covers, `Accurate TAR`, C, INT, `Ball Hawk INT`,
-                PB, `Ball Hawk PB`, T, FF, Penalties) %>%
+                Covers, `Accurate TAR`, C, `Targeted C%`,
+                INT, `Ball Hawk INT`,
+                PB, `Ball Hawk PB`, `Hands on Ball % of Targets`,
+                `Hands on Ball % of Plays`, T, FF, Penalties) %>%
   arrange(desc(EPS)) %>%
+  dplyr::mutate_if(is.numeric, round, digits=4) %>%
+  mutate(`%Man` = scales::percent(`%Man`, accuracy = .1),
+         `Targeted C%` = scales::percent(`Targeted C%`, accuracy = .1),
+         `Hands on Ball % of Targets` = scales::percent(`Hands on Ball % of Targets`, accuracy = .1),
+         `Hands on Ball % of Plays` = scales::percent(`Hands on Ball % of Plays`, accuracy = .1)) %>%
   dplyr::mutate_if(is.numeric, round, digits=2)
+  
 
 write.csv(overall_table,
           "~/Desktop/CoverageNet/src/07_dashboard_aggs/outputs/player_ratings/player_ratings_overall.csv",
@@ -163,6 +175,8 @@ man_overall_table = man_ratings %>%
 man_overall_table[is.na(man_overall_table)] = 0
 
 man_overall_table = man_overall_table %>%
+  inner_join(player_info %>%
+               rename(nflId_def = nflId)) %>%
   mutate(`EPS Penalties` = man_penalties_eps,
          Covers = man_routes,
          `Accurate TAR` = man_accurate_targets,
@@ -173,9 +187,11 @@ man_overall_table = man_overall_table %>%
          `Ball Hawk PB` = man_ball_hawk_pbus,
          T = man_T,
          FF = man_FF,
-         Penalties = man_penalties) %>%
-  inner_join(player_info %>%
-               rename(nflId_def = nflId)) %>%
+         Penalties = man_penalties,
+         `Targeted C%` = replace_na(C/`Accurate TAR`, 0),
+         `Hands on Ball % of Targets` = replace_na((INT + PB)/`Accurate TAR`, 0),
+         `Hands on Ball % of Plays` = replace_na((INT + `Ball Hawk INT` +
+                                                    PB + `Ball Hawk PB`)/`Covers`, 0)) %>%
   inner_join(man_zone_perc) %>%
   dplyr::select(nflId_def, Pos, Player,  G, `Pass Snaps`, `%Man`,
                 `Man EPS`,`Man EPS Tracking`, `Man EPS Closing`,
@@ -183,9 +199,17 @@ man_overall_table = man_overall_table %>%
                 `Man EPS Ball Hawk`, `Man EPS INT Returns`,
                 `SOS Man EPS`,`SOS Man EPS Tracking`, `SOS Man EPS Closing`,
                 `SOS Man EPS Ball Skills`, `SOS Man EPS Tackling`,
-                Covers, `Accurate TAR`, C, INT, `Ball Hawk INT`,
-                PB, `Ball Hawk PB`, T, FF, Penalties) %>%
+                Covers, `Accurate TAR`, C, `Targeted C%`,
+                INT, `Ball Hawk INT`, PB, `Ball Hawk PB`, 
+                `Hands on Ball % of Targets`,
+                `Hands on Ball % of Plays`,
+                T, FF, Penalties) %>%
   arrange(desc(`Man EPS`)) %>%
+  dplyr::mutate_if(is.numeric, round, digits=4) %>%
+  mutate(`%Man` = scales::percent(`%Man`, accuracy = .1),
+         `Targeted C%` = scales::percent(`Targeted C%`, accuracy = .1),
+         `Hands on Ball % of Targets` = scales::percent(`Hands on Ball % of Targets`, accuracy = .1),
+         `Hands on Ball % of Plays` = scales::percent(`Hands on Ball % of Plays`, accuracy = .1)) %>%
   dplyr::mutate_if(is.numeric, round, digits=2)
 
 write.csv(man_overall_table,
@@ -228,6 +252,8 @@ zone_overall_table = zone_ratings %>%
 zone_overall_table[is.na(zone_overall_table)] = 0
 
 zone_overall_table = zone_overall_table %>%
+  inner_join(player_info %>%
+               rename(nflId_def = nflId)) %>%
   mutate(`EPS Penalties` = zone_penalties_eps,
          Covers = zone_covers,
          `Accurate TAR` = zone_accurate_targets,
@@ -238,9 +264,11 @@ zone_overall_table = zone_overall_table %>%
          `Ball Hawk PB` = zone_ball_hawk_pbus,
          T = zone_T,
          FF = zone_FF,
-         Penalties = zone_penalties) %>%
-  inner_join(player_info %>%
-               rename(nflId_def = nflId)) %>%
+         Penalties = zone_penalties,
+         `Targeted C%` = replace_na(C/`Accurate TAR`, 0),
+         `Hands on Ball % of Targets` = replace_na((INT + PB)/`Accurate TAR`, 0),
+         `Hands on Ball % of Plays` = replace_na((INT + `Ball Hawk INT` +
+                                                    PB + `Ball Hawk PB`)/`Covers`, 0)) %>%
   inner_join(man_zone_perc) %>%
   mutate(`%Zone` = 1 - `%Man`) %>%
   dplyr::select(nflId_def, Pos, Player,  G, `Pass Snaps`, `%Zone`,
@@ -249,9 +277,17 @@ zone_overall_table = zone_overall_table %>%
                 `Zone EPS Ball Hawk`, `Zone EPS INT Returns`,
                 `SOS Zone EPS`, `SOS Zone EPS Closing`,
                 `SOS Zone EPS Ball Skills`, `SOS Zone EPS Tackling`,
-                Covers, `Accurate TAR`, C, INT, `Ball Hawk INT`,
-                PB, `Ball Hawk PB`, T, FF, Penalties) %>%
+                Covers, `Accurate TAR`, C, `Targeted C%`,,
+                INT, `Ball Hawk INT`, PB, `Ball Hawk PB`, 
+                `Hands on Ball % of Targets`,
+                `Hands on Ball % of Plays`,
+                T, FF, Penalties) %>%
   arrange(desc(`Zone EPS`)) %>%
+  dplyr::mutate_if(is.numeric, round, digits=4) %>%
+  mutate(`%Zone` = scales::percent(`%Zone`, accuracy = .1),
+         `Targeted C%` = scales::percent(`Targeted C%`, accuracy = .1),
+         `Hands on Ball % of Targets` = scales::percent(`Hands on Ball % of Targets`, accuracy = .1),
+         `Hands on Ball % of Plays` = scales::percent(`Hands on Ball % of Plays`, accuracy = .1)) %>%
   dplyr::mutate_if(is.numeric, round, digits=2)
 
 write.csv(zone_overall_table,
