@@ -132,13 +132,14 @@ route_skills_table[is.na(route_skills_table)] = 0
 route_skills_table = route_skills_table %>% 
   mutate(eps_man_coverage = eps_tracking + eps_saved_closing +
            eps_saved_ball_skills + eps_tackling,
-         eps_man_coverage_no_tackling = eps_man_coverage - eps_tackling,
-         eps_per_man_route = eps_man_coverage/routes) %>%
+         eps_man_coverage_no_tackling = eps_man_coverage - eps_tackling) %>%
+  rename(eps_closing = eps_saved_closing,
+         eps_ball_skills = eps_saved_ball_skills) %>%
   dplyr::select("position", "displayName", "route", "nflId_def", "eps_man_coverage",
                 "routes", "targets",
                 "completions", "PB", "interceptions", "Tackles", "FF",
-                "eps_tracking","eps_saved_closing",
-                "eps_saved_ball_skills","eps_tackling",
+                "eps_tracking","eps_closing",
+                "eps_ball_skills","eps_tackling",
                 "eps_man_coverage_no_tackling") %>%
   rename(INT = interceptions,
          T = Tackles,

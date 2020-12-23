@@ -147,6 +147,17 @@ check2 = skills_table %>%
   arrange(desc(eps_tot))
 
 # By Route ----------------------------------------------------------------
+routes = read.csv("~/Desktop/CoverageNet/src/00_data_wrangle/helper_tables/routes.csv")
+
+route_zone_coverage_cover_counts = wr_db_zone_matchups_tot %>% 
+  inner_join(routes,
+             by = c("gameId", "playId", "nflId_opp" = "nflId")) %>%
+  ungroup() %>%
+  distinct(gameId, playId, nflId, route) %>%
+  group_by(nflId, route) %>%
+  summarize(zone_covers = n()) %>%
+  arrange(desc(zone_covers)) %>%
+  rename(nflId_def = nflId)
 
 route_player_closing_skills = read.csv("~/Desktop/CoverageNet/src/05_evaluate_players_zone/outputs/player_closing_eps_by_route.csv")
 route_player_ball_skills = read.csv("~/Desktop/CoverageNet/src/05_evaluate_players_zone/outputs/player_ball_skills_eps_by_route.csv")
@@ -160,7 +171,8 @@ route_skills_table = route_player_closing_skills %>%
               dplyr::select(-position, -displayName)) %>%
   inner_join(players %>%
                dplyr::select(position, displayName, nflId),
-             by = c("nflId_def" = "nflId"))
+             by = c("nflId_def" = "nflId")) %>%
+  left_join(route_zone_coverage_cover_counts)
 
 route_skills_table[is.na(route_skills_table)] = 0
 
@@ -168,11 +180,13 @@ route_skills_table = route_skills_table %>%
   mutate(eps_zone_coverage =  eps_saved_closing +
            eps_saved_ball_skills + eps_tackling,
          eps_zone_coverage_no_tackling = eps_zone_coverage - eps_tackling) %>%
+  rename(eps_closing = eps_saved_closing,
+         eps_ball_skills = eps_saved_ball_skills) %>%
   dplyr::select("position", "displayName", "route", "nflId_def", "eps_zone_coverage",
-                "targets",
+                "zone_covers","targets",
                 "completions", "PB", "interceptions", "Tackles", "FF",
-                "eps_saved_closing",
-                "eps_saved_ball_skills","eps_tackling",
+                "eps_closing",
+                "eps_ball_skills","eps_tackling",
                 "eps_zone_coverage_no_tackling") %>%
   rename(INT = interceptions,
          T = Tackles,

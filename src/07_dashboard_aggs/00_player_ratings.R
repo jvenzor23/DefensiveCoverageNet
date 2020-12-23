@@ -257,3 +257,154 @@ zone_overall_table = zone_overall_table %>%
 write.csv(zone_overall_table,
           "~/Desktop/CoverageNet/src/07_dashboard_aggs/outputs/player_ratings/player_ratings_zone.csv",
           row.names = FALSE)
+
+
+# by route
+route_man_ratings = read.csv("~/Desktop/CoverageNet/src/04_evaluate_players/outputs/overall_player_skills_summary_by_route.csv")
+route_zone_ratings = read.csv("~/Desktop/CoverageNet/src/05_evaluate_players_zone/outputs/overall_player_skills_summary_by_route.csv")
+
+route_overall_table = route_man_ratings %>%
+  dplyr::select(nflId_def, route, eps_man_coverage, routes, accurate_targets, completions_allowed,
+                PB, INT, T, FF) %>%
+  rename(man_routes = routes,
+         man_accurate_targets = accurate_targets,
+         man_completions_allowed = completions_allowed,
+         man_T = T,
+         man_INTs = INT,
+         man_PB = PB,
+         man_FF = FF,
+         `Man EPS` = eps_man_coverage) %>%
+  dplyr::select(nflId_def, route, `Man EPS`, starts_with("man")) %>%
+  full_join(route_zone_ratings %>%
+              dplyr::select(nflId_def, route, eps_zone_coverage, 
+                            zone_covers, accurate_targets, completions_allowed,
+                            PB, INT, T, FF) %>%
+              rename(zone_accurate_targets = accurate_targets,
+                     zone_completions_allowed = completions_allowed,
+                     zone_INTs = INT,
+                     zone_PB = PB,
+                     zone_T = T,
+                     zone_FF = FF,
+                     `Zone EPS` = eps_zone_coverage) %>%
+              dplyr::select(nflId_def, route, `Zone EPS`, starts_with("zone")))
+
+route_overall_table[is.na(route_overall_table)] = 0
+
+route_overall_table = route_overall_table %>%
+  mutate(EPS = `Man EPS` + `Zone EPS`,
+         Covers = man_routes + zone_covers,
+         `Accurate TAR` = man_accurate_targets + zone_accurate_targets,
+         C = man_completions_allowed + zone_completions_allowed,
+         INT = man_INTs + zone_INTs,
+         PB = man_PB + zone_PB,
+         T = man_T + zone_T,
+         FF = man_FF + zone_FF) %>%
+  inner_join(player_info %>%
+               rename(nflId_def = nflId)) %>%
+  inner_join(man_zone_perc) %>%
+  dplyr::select(nflId_def, Pos, Player,  G, `Pass Snaps`, route, `%Man`,
+                EPS, `Man EPS`, `Zone EPS`,
+                Covers, `Accurate TAR`, C, INT,
+                PB, T, FF) %>%
+  arrange(desc(EPS)) %>%
+  dplyr::mutate_if(is.numeric, round, digits=2)
+
+write.csv(route_overall_table,
+          "~/Desktop/CoverageNet/src/07_dashboard_aggs/outputs/player_ratings/player_ratings_route_overall.csv",
+          row.names = FALSE)
+
+# Man/Overall Aggregation --------------------------------------------------
+
+route_man_overall_table = route_man_ratings %>%
+  dplyr::select(nflId_def, route, eps_man_coverage, eps_tracking, eps_closing,
+                eps_ball_skills, eps_tackling,
+                routes, accurate_targets, completions_allowed,
+                PB, INT, T, FF) %>%
+  rename(man_routes = routes,
+         man_accurate_targets = accurate_targets,
+         man_completions_allowed = completions_allowed,
+         man_T = T,
+         man_INTs = INT,
+         man_PB = PB,
+         man_FF = FF,
+         `Man EPS` = eps_man_coverage,
+         `Man EPS Tracking` = eps_tracking,
+         `Man EPS Closing` = eps_closing,
+         `Man EPS Ball Skills` = eps_ball_skills,
+         `Man EPS Tackling` = eps_tackling) %>%
+  dplyr::select(nflId_def, route, `Man EPS`, starts_with("man"))
+
+route_man_overall_table[is.na(route_man_overall_table)] = 0
+
+route_man_overall_table = route_man_overall_table %>%
+  mutate(Covers = man_routes,
+         `Accurate TAR` = man_accurate_targets,
+         C = man_completions_allowed,
+         INT = man_INTs,
+         PB = man_PB,
+         T = man_T,
+         FF = man_FF) %>%
+  inner_join(player_info %>%
+               rename(nflId_def = nflId)) %>%
+  inner_join(man_zone_perc) %>%
+  dplyr::select(nflId_def, Pos, Player,  G, `Pass Snaps`, `%Man`,route,
+                `Man EPS`,`Man EPS Tracking`, `Man EPS Closing`,
+                `Man EPS Ball Skills`, `Man EPS Tackling`, 
+                Covers, `Accurate TAR`, C, INT,
+                PB, T, FF) %>%
+  arrange(desc(`Man EPS`)) %>%
+  dplyr::mutate_if(is.numeric, round, digits=2)
+
+write.csv(route_man_overall_table,
+          "~/Desktop/CoverageNet/src/07_dashboard_aggs/outputs/player_ratings/player_ratings_route_man.csv",
+          row.names = FALSE)
+
+
+# Zone Overall Table ------------------------------------------------------
+
+route_zone_overall_table = route_zone_ratings %>%
+  dplyr::select(nflId_def, route, eps_zone_coverage, eps_closing,
+                eps_ball_skills, eps_tackling,
+                zone_covers, accurate_targets, completions_allowed,
+                PB, INT, T, FF) %>%
+  rename(zone_covers = zone_covers,
+         zone_accurate_targets = accurate_targets,
+         zone_completions_allowed = completions_allowed,
+         zone_T = T,
+         zone_INTs = INT,
+         zone_PB = PB,
+         zone_FF = FF,
+         `Zone EPS` = eps_zone_coverage,
+         `Zone EPS Closing` = eps_closing,
+         `Zone EPS Ball Skills` = eps_ball_skills,
+         `Zone EPS Tackling` = eps_tackling) %>%
+  dplyr::select(nflId_def, route, `Zone EPS`, starts_with("zone"))
+
+route_zone_overall_table[is.na(route_zone_overall_table)] = 0
+
+route_zone_overall_table = route_zone_overall_table %>%
+  mutate(Covers = zone_covers,
+         `Accurate TAR` = zone_accurate_targets,
+         C = zone_completions_allowed,
+         INT = zone_INTs,
+         PB = zone_PB,
+         T = zone_T,
+         FF = zone_FF) %>%
+  inner_join(player_info %>%
+               rename(nflId_def = nflId)) %>%
+  inner_join(man_zone_perc) %>%
+  mutate(`%Zone` = 1 - `%Man`) %>%
+  dplyr::select(nflId_def, Pos, Player,  G, `Pass Snaps`, `%Zone`, route,
+                `Zone EPS`, `Zone EPS Closing`,
+                `Zone EPS Ball Skills`, `Zone EPS Tackling`, 
+                Covers, `Accurate TAR`, C, INT,
+                PB, T, FF) %>%
+  arrange(desc(`Zone EPS`)) %>%
+  dplyr::mutate_if(is.numeric, round, digits=2)
+
+write.csv(route_zone_overall_table,
+          "~/Desktop/CoverageNet/src/07_dashboard_aggs/outputs/player_ratings/player_ratings_route_zone.csv",
+          row.names = FALSE)
+
+
+
