@@ -34,14 +34,26 @@ player_info = read.csv("~/Desktop/CoverageNet/src/00_data_wrangle/helper_tables/
   mutate(Player = paste0(displayName, " (", team, ")")) %>%
   dplyr::select(nflId, Player, G, `Pass Snaps`, Pos)
 
-wr_db_man_matchups = read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/man_defense_off_coverage_assignments_all_lbs.csv")
-wr_db_zone_matchups_tot = read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/zone_defense_off_coverage_assignments_all_lbs.csv")
+man_zone_classification = rbind(
+  read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/all_positions_pass_attempts_man_zone_classes.csv") %>%
+    dplyr::select(gameId, playId, nflId, zone_probability),
+  read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/all_positions_sacks_man_zone_classes.csv") %>%
+    dplyr::select(gameId, playId, nflId, zone_probability)
+) %>%
+  arrange(gameId, playId, nflId) %>%
+  distinct(gameId, playId, nflId, .keep_all = TRUE)
 
-man_zone_perc = wr_db_man_matchups %>%
+man_coverage = read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/man_defense_off_coverage_assignments_all_lbs.csv")
+
+zone_coverage = man_zone_classification %>%
+  anti_join(man_coverage,
+            by = c("gameId", "playId", "nflId" = "nflId_def"))
+
+man_zone_perc = man_coverage %>%
   distinct(gameId, playId, nflId_def) %>%
   group_by(nflId_def) %>%
   summarize(man_plays = n()) %>%
-  full_join(wr_db_zone_matchups_tot %>%
+  full_join(zone_coverage %>%
               rename(nflId_def = nflId) %>%
               distinct(gameId, playId, nflId_def) %>%
               group_by(nflId_def) %>%

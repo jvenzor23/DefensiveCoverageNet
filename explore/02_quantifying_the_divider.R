@@ -36,6 +36,10 @@ coverages_week1 = read.csv("~/Desktop/CoverageNet/inputs/coverages_week1.csv")
 pt_data = read.csv("~/Desktop/CoverageNet/src/00_data_wrangle/outputs/week1.csv")
 
 man_coverage = read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/man_defense_off_coverage_assignments_all_lbs.csv")
+man_coverage = man_coverage %>%
+  group_by(gameId, playId, nflId_off) %>%
+  filter(n() == 1)
+
 closest_pairs = read.csv("~/Desktop/CoverageNet/src/01_identify_man_coverage/outputs/defense_off_closest_players.csv")
 
 # Quantifying the Divider -------------------------------------------------
@@ -45,6 +49,9 @@ files = dir()[startsWith(dir(), "week")]
 
 divider_total = data.frame()
 divider_all_total = data.frame()
+divider_snap_total = data.frame()
+divider_snap_all_total = data.frame()
+
 
 for(file in files){
   
@@ -77,6 +84,86 @@ for(file in files){
     rename(x_snap_receiver = x,
            y_snap_receiver = y,
            nflId_snap_receiver = nflId)
+  
+  # filtering to between ball snap and pass attempt (or 2.5 seconds!)
+  divider_snap = pt_data %>%
+    filter(event == "ball_snap") %>%
+    inner_join(man_coverage, 
+               by = c("gameId", "playId", "nflId" = "nflId_def")) %>%
+    inner_join(pt_data %>%
+                 dplyr::select(gameId, playId, frameId, nflId, x, y) %>%
+                 rename(x_off = x,
+                        y_off = y),
+               by = c("gameId", "playId", "frameId", "nflId_off" = "nflId")) %>%
+    # anti_join(within_the_25) %>%
+    inner_join(snap_data) %>%
+    inner_join(receiver_snap_data,
+               by = c("gameId", "playId", "nflId_off" = "nflId_snap_receiver")) %>%
+    mutate(receiver_x_disp = x_off - x_snap_receiver,
+           receiver_disp_towards_sideline = if_else(y_snap_receiver < 160/6, 
+                                                    y_snap_receiver - y_off,
+                                                    y_off - y_snap_receiver),
+           receiver_dist_from_sideline = if_else(y_off < 160/6, 
+                                                 y_off,
+                                                 160/3 - y_off)) %>%
+    mutate(separation = sqrt((x_off - x)^2 + (y_off - y)^2)) %>%
+    # filter(separation <= 4) %>%
+    mutate(sideline_distance_from_snap = if_else(y < 160/6,
+                                                 y_snap,
+                                                 160/3 - y_snap)) %>%
+    ungroup() %>%
+    mutate(outside_leverage = if_else(y < 160/6, 
+                                      y_off - y,
+                                      y - y_off),
+           db_distance_from_sideline = if_else(y < 160/6, 
+                                               y,
+                                               160/3 - y)) %>%
+    dplyr::select(gameId, playId, frameId, nflId, nflId_off,separation,x,x_off,
+                  receiver_x_disp, receiver_disp_towards_sideline,
+                  receiver_dist_from_sideline,
+                  sideline_distance_from_snap, db_distance_from_sideline, outside_leverage)
+  
+  # filtering to between ball snap and pass attempt (or 2.5 seconds!)
+  divider_snap_all = pt_data %>%
+    filter(event == "ball_snap") %>%
+    inner_join(closest_pairs,
+               by = c("gameId", "playId", "nflId")) %>%
+    filter(frameId >= frameId_start,
+           frameId <= frameId_end) %>%
+    inner_join(pt_data %>%
+                 dplyr::select(gameId, playId, frameId, nflId, x, y) %>%
+                 rename(x_off = x,
+                        y_off = y),
+               by = c("gameId", "playId", "frameId", "nflId_opp" = "nflId")) %>%
+    # anti_join(within_the_25) %>%
+    inner_join(snap_data) %>%
+    inner_join(receiver_snap_data,
+               by = c("gameId", "playId", "nflId_opp" = "nflId_snap_receiver")) %>%
+    mutate(receiver_x_disp = x_off - x_snap_receiver,
+           receiver_disp_towards_sideline = if_else(y_snap_receiver < 160/6, 
+                                                    y_snap_receiver - y_off,
+                                                    y_off - y_snap_receiver),
+           receiver_dist_from_sideline = if_else(y_off < 160/6, 
+                                                 y_off,
+                                                 160/3 - y_off)) %>%
+    mutate(separation = sqrt((x_off - x)^2 + (y_off - y)^2)) %>%
+    # filter(separation <= 4) %>%
+    mutate(sideline_distance_from_snap = if_else(y < 160/6,
+                                                 y_snap,
+                                                 160/3 - y_snap)) %>%
+    ungroup() %>%
+    mutate(outside_leverage = if_else(y < 160/6, 
+                                      y_off - y,
+                                      y - y_off),
+           db_distance_from_sideline = if_else(y < 160/6, 
+                                               y,
+                                               160/3 - y)) %>%
+    rename(nflId_off = nflId_opp) %>%
+    dplyr::select(gameId, playId, frameId, nflId, nflId_off,separation,x,x_off,
+                  receiver_x_disp, receiver_disp_towards_sideline,
+                  receiver_dist_from_sideline,
+                  sideline_distance_from_snap, db_distance_from_sideline, outside_leverage)
+  
   
   # filtering to between ball snap and pass attempt (or 2.5 seconds!)
   divider = pt_data %>%
@@ -172,9 +259,24 @@ for(file in files){
   divider_all_total = rbind.data.frame(divider_all_total,
                                        divider_all)
   
+  divider_snap_total = rbind.data.frame(divider_snap_total,
+                                        divider_snap)
+  
+  divider_snap_all_total = rbind.data.frame(divider_snap_all_total,
+                                        divider_snap_all)
+  
+  
     write.csv(divider_total,
             "~/Desktop/CoverageNet/explore/outputs/divider_man_data.csv",
             row.names = FALSE)
+    
+    write.csv(divider_snap_total,
+              "~/Desktop/CoverageNet/explore/outputs/divider_snap_data.csv",
+              row.names = FALSE)
+    
+    write.csv(divider_snap_all_total,
+              "~/Desktop/CoverageNet/explore/outputs/divider_snap_all_data.csv",
+              row.names = FALSE)
     
     write.csv(divider_all_total,
               "~/Desktop/CoverageNet/explore/outputs/divider_all_data.csv",
@@ -290,3 +392,122 @@ divider_agg2 %>%
        title = "Average Divider Distance from Sideline",
        subtitle = "The divider increases as the snap location moves further from the sideline.")
 
+
+
+# looking at snap data ----------------------------------------------------
+
+divider_snap_agg = divider_snap_total %>%
+  filter(sideline_distance_from_snap > 20,
+         sideline_distance_from_snap < 32) %>%
+  mutate(distance_from_sideline_disc = round(receiver_dist_from_sideline)) %>%
+  group_by(distance_from_sideline_disc) %>%
+  summarize(count = n(),
+            avg_outside_leverage = mean(outside_leverage)) %>%
+  arrange(distance_from_sideline_disc)
+
+
+divider_snap_agg %>%
+  filter(distance_from_sideline_disc <= 20,
+       distance_from_sideline_disc >= 5) %>%
+  ggplot() +
+  geom_point(aes(x = distance_from_sideline_disc, y = avg_outside_leverage),
+             pch = 21, fill = "darkgray", color = "black") +
+  geom_smooth(aes(x = distance_from_sideline_disc, y = avg_outside_leverage), method = "lm",
+              se = FALSE, size = .75, color = "blue") +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  labs(x = "Defender Distance from Sideline (yards)",
+       y = "Defender Outside Leverage (yards)",
+       title = "Relationship Between Defender Outside Leverage and Distance From Sideline",
+       subtitle = "Average divider employed is ~9.5 yards.")
+
+divider_agg2 = divider_snap_total %>%
+  mutate(sideline_distance_from_snap_disc = case_when(sideline_distance_from_snap < 160/6 - 3 ~ '1 CLOSE',
+                                                      sideline_distance_from_snap < 160/6 + 3 ~ '2 MIDDLE',
+                                                      TRUE ~ '3 FAR')) %>%
+  filter(sideline_distance_from_snap >= 20,
+         sideline_distance_from_snap <= 32) %>%
+  rowwise() %>%
+  mutate(distance_from_sideline_disc = round(receiver_dist_from_sideline)) %>%
+  filter(distance_from_sideline_disc <= 15,
+         distance_from_sideline_disc >= 5) %>%
+  group_by(sideline_distance_from_snap_disc, distance_from_sideline_disc) %>%
+  summarize(count = n(),
+            avg_outside_leverage = mean(outside_leverage)) %>%
+  filter(count > 50) %>%
+  arrange(distance_from_sideline_disc) %>%
+  mutate(sideline_distance_from_snap_disc = paste0("Snap Location: ", sideline_distance_from_snap_disc))
+
+plt_table = rbind.data.frame(
+  divider_agg2 %>% distinct(sideline_distance_from_snap_disc) %>%
+    mutate(x = 5, y = 0),
+  do(divider_agg2 %>%
+       filter(distance_from_sideline_disc <= 15,
+              distance_from_sideline_disc >= 5) %>%
+       group_by(sideline_distance_from_snap_disc), 
+     tidy(lm(avg_outside_leverage ~ distance_from_sideline_disc, 
+             data = .))) %>%
+    group_by(sideline_distance_from_snap_disc) %>%
+    summarize(x = -1*estimate[1]/estimate[2]) %>%
+    dplyr::select(sideline_distance_from_snap_disc, x) %>%
+    mutate(y = 0),
+  do(divider_agg2 %>%
+       filter(distance_from_sideline_disc <= 15,
+              distance_from_sideline_disc >= 5) %>%
+       group_by(sideline_distance_from_snap_disc), 
+     tidy(lm(avg_outside_leverage ~ distance_from_sideline_disc, 
+             data = .))) %>%
+    group_by(sideline_distance_from_snap_disc) %>%
+    summarize(x = -1*estimate[1]/estimate[2]) %>%
+    dplyr::select(sideline_distance_from_snap_disc, x) %>%
+    mutate(y = -1.3)) %>%
+  ungroup() %>%
+  dplyr::arrange(sideline_distance_from_snap_disc, x, desc(y))
+
+
+divider_agg2 %>%
+  filter(distance_from_sideline_disc <= 15,
+         distance_from_sideline_disc >= 5) %>%
+  ggplot() +
+  geom_point(aes(x = distance_from_sideline_disc, y = avg_outside_leverage),
+             pch = 21, fill = "darkgray", color = "black") +
+  geom_smooth(aes(x = distance_from_sideline_disc, y = avg_outside_leverage), method = "lm",
+              se = FALSE, size = .5, color = "blue") +
+  geom_path(data = plt_table, aes(x = x, y = y), linetype = "dashed") +
+  facet_wrap(~sideline_distance_from_snap_disc, ncol = 1) + 
+  labs(x = "Defender Distance from Sideline (yards)",
+       y = "Defender Outside Leverage (yards)",
+       title = "Average Divider Distance from Sideline",
+       subtitle = "The divider increases as the snap location moves further from the sideline.")
+
+
+# Looking at EPA ----------------------------------------------------------
+
+epa_tracking_total = read.csv("~/Desktop/CoverageNet/src/03_coverageNet/03_score_tracking/outputs/routes_tracking_epa.csv")
+
+epa_tracking_total2 = epa_tracking_total %>% 
+  group_by(gameId, playId) %>%
+  filter(frameId < min(frameId) + 20) %>%
+  group_by(gameId, playId, targetNflId) %>%
+  summarize(max_epa = max(epa_pass_attempt))
+
+snap_w_epa = divider_snap_total %>%
+  filter(sideline_distance_from_snap > 20,
+         sideline_distance_from_snap < 32) %>%
+  mutate(distance_from_sideline_disc = round(receiver_dist_from_sideline)) %>%
+  filter(distance_from_sideline_disc <= 15,
+         distance_from_sideline_disc >= 5) %>%
+  mutate(leverage_type = case_when(abs(outside_leverage) <  .25 ~ "FACE UP",
+                                   outside_leverage > 0 ~ 'OUTSIDE LEVERAGE',
+                                   TRUE ~ 'INSIDE LEVERAGE')) %>%
+  inner_join(epa_tracking_total2,
+             by = c("gameId", "playId", "nflId_off" = "targetNflId")) %>%
+  group_by(leverage_type, distance_from_sideline_disc) %>%
+  summarize(count = n(),
+            avg_leverage = mean(outside_leverage),
+            avg_separation = mean(separation),
+            avg_max_epa = mean(max_epa))
+
+snap_w_epa %>%
+  ggplot() +
+  geom_point(aes(x = distance_from_sideline_disc, y = avg_max_epa, color = leverage_type)) + 
+  geom_line(aes(x = distance_from_sideline_disc, y = avg_max_epa, color = leverage_type))

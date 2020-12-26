@@ -247,6 +247,15 @@ ball_skills_ability %>%
   geom_point(aes(x = epa_pass_arrived, y = epa_throw)) +
   geom_line(aes(x = epa_pass_arrived, y = fitted_epa_pass_throw), color = "blue")
 
+# getting target win rate
+target_win_rate = ball_skills_ability %>%
+  inner_join(my_epa) %>%
+  filter(!is.na(my_epa),
+         !((passResult == 'I')&(my_epa > 0))) %>%
+  group_by(nflId_def) %>%
+  summarize(target_losses = sum(my_epa > 0),
+            target_win_rate = mean(my_epa < 0))
+
 player_extremes_ball_skill_ability = ball_skills_ability %>%
   mutate(eps_ball_skills = round(epa_pass_arrived - epa_throw, 3)) %>%
   dplyr::select(gameId, playId, nflId_def, targetNflId, eps_ball_skills) %>%
@@ -461,7 +470,8 @@ ball_skills_penalty = ball_skills_defensive_penalties_score %>%
 
 ball_skills_ability3 = ball_skills_ability2 %>%
   left_join(ball_skills_penalty) %>%
-  left_join(pbus)
+  left_join(pbus) %>%
+  left_join(target_win_rate)
 
 ball_skills_ability3[is.na(ball_skills_ability3)] = 0  
 

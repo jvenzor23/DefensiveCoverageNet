@@ -162,8 +162,8 @@ example.play = pbp_data %>%
   inner_join(
     pbp_data %>%
       # dplyr::select(gameId, playId) %>%
-      filter(gameId == 2018090901,
-           playId == 1912) %>%
+      filter(gameId == 2018090600,
+           playId == 1715) %>%
       distinct()
       # sample_n(1)
   )
@@ -176,11 +176,33 @@ example_zones = example.play %>%
   inner_join(zone_coverage %>%
               distinct(gameId, playId, nflId))
 
+example_rushers = example.play %>%
+  filter(!is.na(nflId),
+         !IsOnOffense) %>%
+  anti_join(zone_coverage %>%
+              distinct(gameId, playId, nflId)) %>%
+  anti_join(man_coverage %>%
+              distinct(gameId, playId, nflId_def) %>%
+              rename(nflId = nflId_def))
+
 example.play.info = plays %>%
   inner_join(example.play %>%
                dplyr::select(gameId, playId) %>%
                distinct()) %>%
-  inner_join(targeted_receiver)
+  inner_join(targeted_receiver) %>%
+  mutate(DownDesc = case_when(down == 1 ~ paste("1st and",
+                                                yardsToGo),
+                              down == 2 ~ paste("2nd and",
+                                                yardsToGo),
+                              down == 3 ~ paste("3rd and",
+                                                yardsToGo),
+                              TRUE ~ paste("4th and",
+                                           yardsToGo)))
+
+game.info = games %>%
+  inner_join(example.play %>%
+               dplyr::select(gameId, playId) %>%
+               distinct())
 
 
 ## General field boundaries
@@ -191,19 +213,36 @@ hash.left <- 12
 hash.width <- 3.3
 
 ## Specific boundaries for a given play
-ymin <- max(round(min(example.play$x, na.rm = TRUE), -1), 0)
-ymax <- min(round(max(example.play$x, na.rm = TRUE) + 20, -1), 120)
+ymin <- max(round(min(example.play$x, na.rm = TRUE), -1), 0) + 5
+ymax <- min(round(max(example.play$x, na.rm = TRUE) + 15, -1), 120)
 df.hash <- expand.grid(x = c(0, 23.36667, 29.96667, xmax), y = (10:110))
 df.hash <- df.hash %>% filter(!(floor(y %% 5) == 0))
 df.hash <- df.hash %>% filter(y < ymax, y > ymin)
 
+yardline = (example.play %>% distinct(YardsFromOwnGoal))$YardsFromOwnGoal
+firstDownYardLine = yardline + example.play.info$yardsToGo
+
 animate.play = 
   ggplot() +
-  scale_linetype_manual(values = c("solid", "dashed")) + 
   scale_size_manual(values = c(6, 4, 6), guide = FALSE) + 
   scale_shape_manual(values = c(21, 16, 21), guide = FALSE) +
   scale_fill_manual(values = c("#e31837", "#654321", "#002244"), guide = FALSE) + 
   scale_colour_manual(values = c("black", "#654321", "#c60c30"), guide = FALSE) + 
+  annotate("polygon", x = c(xmin, xmin, xmax, xmax), 
+           y = c(ymin, yardline + 10, yardline + 10, ymin), colour = "black",
+           fill = "limegreen",
+           alpha = .5
+  ) + 
+  annotate("polygon", x = c(xmin, xmin, xmax, xmax), 
+           y = c(yardline + 10, firstDownYardLine + 10, firstDownYardLine + 10, yardline + 10), colour = "black",
+           fill = "limegreen",
+           alpha = .85
+  ) + 
+  annotate("polygon", x = c(xmin, xmin, xmax, xmax), 
+           y = c(firstDownYardLine + 10, ymax, ymax, firstDownYardLine + 10), colour = "black",
+           fill = "limegreen",
+           alpha = .5
+  ) + 
   annotate("text", x = df.hash$x[df.hash$x < 55/2], 
            y = df.hash$y[df.hash$x < 55/2], label = "_", hjust = 0, vjust = -0.2) + 
   annotate("text", x = df.hash$x[df.hash$x > 55/2], 
@@ -218,19 +257,33 @@ animate.play =
   annotate("text", x = rep((xmax - hash.left), 11), y = seq(10, 110, by = 10), 
            label = c("   G", seq(10, 50, by = 10), rev(seq(10, 40, by = 10)), "G   "), 
            angle = 90, size = 4) + 
-  annotate("segment", x = c(xmin, xmin, xmax, xmax), 
-           y = c(ymin, ymax, ymax, ymin), 
-           xend = c(xmin, xmax, xmax, xmin), 
-           yend = c(ymax, ymax, ymin, ymin), colour = "black") + 
-  geom_point(data = example_zones, aes(x = (xmax-y), y = x + 10, group = nflId), fill = "green", color = "green",  alpha = 0.5, size = 10) +
+  geom_segment(aes(x = 0, xend = xmax,
+                   y = yardline + 10, yend = yardline + 10),
+               color = "blue",
+               size = 1,
+               alpha = .7) +
+  geom_segment(aes(x = 0, xend = xmax,
+                   y = firstDownYardLine + 10, yend = firstDownYardLine + 10),
+               color = "yellow",
+               size = 1) +
+  geom_point(data = example_zones, aes(x = (xmax-y), y = x + 10, group = nflId), fill = "blue", color = "white",  alpha = 0.5, size = 10) +
+  geom_point(data = example_rushers, aes(x = (xmax-y), y = x + 10, group = nflId), fill = "blue", color = "red",  alpha = 0.5, size = 10) +
   geom_point(data = example.play, aes(x = (xmax-y), y = x + 10, shape = team,
-                                      fill = team, group = nflId, size = team, colour = team), alpha = 0.7) + 
-  geom_text(data = example.play, aes(x = (xmax-y), y = x + 10, label = jerseyNumber), colour = "white", 
+                                      fill = team, group = nflId, size = team, colour = team), alpha = 0.9) + 
+  geom_text(data = example.play, aes(x = (xmax-y), y = x + 10, label = jerseyNumber, group = nflId), colour = "white", 
             vjust = 0.36, size = 3.5) + 
   geom_segment(aes(x = (xmax - y_off), y = x_off + 10, xend = (xmax - y_def), yend = x_def + 10, group = nflId_def, 
                    linetype = coverage_type), 
-                color = "black", data = example_man_assignments_segment_plt) + 
+                color = "black", size = 1, data = example_man_assignments_segment_plt) + 
+  geom_point(data = example.play %>%
+               filter(is.na(nflId)), aes(x = (xmax-y), y = x + 10), 
+             fill = "brown", color = "#654321", shape = 16, size = 4,
+             alpha = 1) + 
   ylim(ymin, ymax) + 
+  labs(title = paste0(game.info$visitorTeamAbbr, " @ ", game.info$homeTeamAbbr,
+                      " (", game.info$gameDate, ")"),
+       subtitle = trimws(paste0("Down and Distance: ", toString(example.play.info$DownDesc), "\n", "\n",
+                        paste(strwrap(paste("Play Description:", toString(example.play.info$playDescription))), collapse="\n")))) +
   coord_fixed() +  
   theme(axis.line=element_blank(),
         axis.text.x=element_blank(),
