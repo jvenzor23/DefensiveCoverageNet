@@ -109,7 +109,8 @@ ggplot() +
        title = "Coverage Classification By Position Group and Defensive Call",
        subtitle = "Week 1 data only (tagged defensive coverages from week 1 were shared)",
        fill = "Defensive Coverage") + 
-  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1),
+                     limits = c(0, .8)) +
   theme_minimal()
 
 ggsave("~/Desktop/CoverageNet/src/08_writeup/images/PositionDefenseCoverageDist.png",

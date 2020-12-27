@@ -330,6 +330,7 @@ ball_hawks_int = interceptions_incompletions_not_identified %>%
   inner_join(pass_attempt_epa) %>%
   inner_join(pass_result_epa) %>%
   filter(!is.na(epa_throw)) %>%
+  anti_join(drops) %>%
   group_by(nflId) %>%
   summarize(ball_hawk_ints = n(),
             ball_hawk_ints_eps = sum(epa_pass_attempt - epa_throw),

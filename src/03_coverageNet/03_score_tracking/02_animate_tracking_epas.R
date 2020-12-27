@@ -26,7 +26,7 @@ games = read.csv("~/Desktop/CoverageNet/inputs/games.csv")
 plays = read.csv("~/Desktop/CoverageNet/inputs/plays.csv")
 targeted_receiver = read.csv("~/Desktop/CoverageNet/inputs/targetedReceiver.csv")
 
-pbp_data = read.csv("~/Desktop/CoverageNet/src/00_data_wrangle/outputs/week17.csv")
+pbp_data = read.csv("~/Desktop/CoverageNet/src/00_data_wrangle/outputs/week1.csv")
 
 epa_tracking_total = read.csv("~/Desktop/CoverageNet/src/03_coverageNet/03_score_tracking/outputs/routes_tracking_epa.csv")
 
@@ -39,19 +39,6 @@ pbp_data = pbp_data %>%
   inner_join(epa_tracking_total %>%
                distinct(gameId, playId))
 
-pbp_data = pbp_data %>%
-  inner_join(games %>%
-               filter(visitorTeamAbbr == "CLE"))
-
-plays = plays %>%
-  inner_join(games %>%
-               filter(visitorTeamAbbr == "CLE")) %>%
-  inner_join(pbp_data %>%
-               distinct(gameId, playId)) %>%
-  arrange(playId)
-
-epa_tracking_total %>%
-  filter(gameId == 2018123000)
 # Animating a Play --------------------------------------------------------
 
 ## Select Play
@@ -62,8 +49,8 @@ example.play = pbp_data %>%
   inner_join(
     pbp_data %>%
       dplyr::select(gameId, playId) %>%
-      filter(gameId == 2018123000,
-            playId == 2528) %>%
+      filter(gameId == 2018090901,
+            playId == 704) %>%
       distinct()
       # sample_n(1)
   )
@@ -138,6 +125,12 @@ example.play.info = plays %>%
                                                 yardsToGo),
                               TRUE ~ paste("4th and",
                                            yardsToGo)))
+
+
+game.info = games %>%
+  inner_join(example.play %>%
+               dplyr::select(gameId, playId) %>%
+               distinct())
 
 ## General field boundaries
 xmin <- 0
@@ -228,9 +221,10 @@ animate.play =
         panel.grid.major=element_blank(),
         panel.grid.minor=element_blank(),
         plot.background=element_blank()) + 
-  labs(title = paste0("Down and Distance: ", toString(example.play.info$DownDesc)),
-       subtitle = paste(strwrap(toString(example.play.info$playDescription)), collapse="\n")
-  ) +
+  labs(title = paste0(game.info$visitorTeamAbbr, " @ ", game.info$homeTeamAbbr,
+                      " (", game.info$gameDate, ")"),
+       subtitle = trimws(paste0("Down and Distance: ", toString(example.play.info$DownDesc), "\n", "\n",
+                                paste(strwrap(paste("Play Description:", toString(example.play.info$playDescription))), collapse="\n")))) +
   transition_reveal(frameId)  +
   ease_aes('linear')
 
@@ -259,7 +253,8 @@ animate.epas =
          "\n", "EPA Pass Arrived = ", gsub("-", "\u2013", toString(replace_na(round(example.play.info$epa_pass_arrived, 2), "N/A"))),
          "\n", "EPA Pass Caught = ", gsub("-", "\u2013", toString(replace_na(round(example.play.info$epa_throw, 2), "N/A"))),
          "\n", "EPA YAC = ", gsub("-", "\u2013", toString(replace_na(round(example.play.info$epa_yac, 2), "N/A"))),
-         "\n", "EPA INT Return = ", gsub("-", "\u2013", toString(replace_na(round(example.play.info$epa_yaint, 2), "N/A"))))) +
+         "\n", "EPA INT Return = ", gsub("-", "\u2013", toString(replace_na(round(example.play.info$epa_yaint, 2), "N/A"))),
+         "\n")) +
   transition_time(frameId)  +
   ease_aes('linear')
 

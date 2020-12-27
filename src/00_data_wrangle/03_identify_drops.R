@@ -120,9 +120,15 @@ pbp_data_2018 = read_csv("reg_pbp_2018.csv", col_types = cols()) %>%
 pbus = pbp_data_2018 %>%
   filter(!is.na(pass_defense_1_player_name))
 
+ints = pbp_data_2018 %>%
+  filter(!is.na(interception_player_name))
+
 # should be 0!
 drops_and_pbu = drops_tot %>%
   inner_join(pbus)
+
+drops_and_ints = drops_tot %>%
+  inner_join(ints)
 
 drops_clean = drops_tot %>%
   anti_join(drops_and_pbu) %>%
