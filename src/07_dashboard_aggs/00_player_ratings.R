@@ -280,11 +280,11 @@ zone_overall_table = zone_overall_table %>%
   inner_join(player_info %>%
                rename(nflId_def = nflId)) %>%
   mutate(`EPS Penalties` = zone_penalties_eps,
-         `Zone EPS Per Game` = `Zone EPS`/G,
-         `Zone EPS Per Snap` = `Zone EPS`/`Pass Snaps`,
-         `SOS Zone EPS Per Game` = `SOS Zone EPS`/G,
-         `SOS Zone EPS Per Snap` = `SOS Zone EPS`/`Pass Snaps`,
          Covers = zone_covers,
+         `Zone EPS Per Game` = `Zone EPS`/G,
+         `Zone EPS Per Cover` = `Zone EPS`/Covers,
+         `SOS Zone EPS Per Game` = `SOS Zone EPS`/G,
+         `SOS Zone EPS Per Cover` = `SOS Zone EPS`/Covers,
          `Accurate TAR` = zone_accurate_targets,
          C = zone_completions_allowed,
          INT = zone_INTs,
@@ -301,11 +301,11 @@ zone_overall_table = zone_overall_table %>%
   inner_join(man_zone_perc) %>%
   mutate(`%Zone` = 1 - `%Man`) %>%
   dplyr::select(nflId_def, Pos, Player,  G, `Pass Snaps`, `%Zone`,
-                `Zone EPS`, `Zone EPS Per Game`, `Zone EPS Per Snap`,
+                `Zone EPS`, `Zone EPS Per Game`, `Zone EPS Per Cover`,
                 `Zone EPS Closing`,
                 `Zone EPS Ball Skills`, `Zone EPS Tackling`, 
                 `Zone EPS Ball Hawk`, `Zone EPS INT Returns`,
-                `SOS Zone EPS`, `SOS Zone EPS Per Game`,`SOS Zone EPS Per Snap`,
+                `SOS Zone EPS`, `SOS Zone EPS Per Game`,`SOS Zone EPS Per Cover`,
                 `SOS Zone EPS Closing`,
                 `SOS Zone EPS Ball Skills`, `SOS Zone EPS Tackling`,
                 Covers, `Accurate TAR`, C, `Targeted C%`,,
