@@ -299,7 +299,9 @@ animate_coverages <- function(week,
           panel.border=element_blank(),
           panel.grid.major=element_blank(),
           panel.grid.minor=element_blank(),
-          plot.background=element_blank()) + 
+          plot.background=element_blank(),
+          plot.title = element_text(size=14),
+          plot.subtitle = element_text(size=12)) + 
     # labs(title = toString(example.play.info$coverage),
     #      subtitle = paste0(toString(example.play.info$playDescription),
     #                        "\n", "EPA = ", toString(round(example.play.info$epa, 2)))) +

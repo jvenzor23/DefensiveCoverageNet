@@ -93,6 +93,12 @@ coverage_by_defense_position_agg = total_coverage %>%
 coverage_summary_plot = rbind.data.frame(coverage_by_position_agg,
                               coverage_by_defense_position_agg)
 
+my_theme = theme_minimal() +
+  theme(plot.title = element_text(size=10),
+        plot.subtitle = element_text(size=8),
+        axis.title = element_text(size=10),
+        legend.title = element_text(size=10))
+
 ggplot() +
   # scale_fill_manual(values = c("dodgerblue3", "orangered2")) +
   geom_bar(data = coverage_by_defense_position_agg,
@@ -102,8 +108,8 @@ ggplot() +
            color = "black",
            size = .2,
            stat = "identity",
-           position = position_dodge(width=0.6),
-           width = .55) +
+           position = position_dodge(width=0.5),
+           width = .45) +
   labs(x = "Position Group",
        y = "% of Plays in Man Coverage",
        title = "Coverage Classification By Position Group and Defensive Call",
@@ -111,11 +117,11 @@ ggplot() +
        fill = "Defensive Coverage") + 
   scale_y_continuous(labels = scales::percent_format(accuracy = 1),
                      limits = c(0, .8)) +
-  theme_minimal()
+  my_theme
 
 ggsave("~/Desktop/CoverageNet/src/08_writeup/images/PositionDefenseCoverageDist.png",
-       height = 4,
-       width = 8)
+       height = 3,
+       width = 6)
 
 # Vizualizing A Zone Play -------------------------------------------------
 
@@ -132,6 +138,7 @@ animate.man.play = man.coverage.play.info$animate.play
 man.play.length.ex = man.coverage.play.info$play.length.ex
 
 animate(animate.man.play, fps = 10, nframe = man.play.length.ex)
+man_gif = animate(animate.man.play, fps = 10, nframe = man.play.length.ex)
 animate(animate.man.play, 
         nframes = man.play.length.ex, device = "png", fps = 10,
         renderer = file_renderer("~/Desktop/CoverageNet/src/08_writeup/images/ManCoverageEx.png", 
@@ -144,8 +151,8 @@ anim_save("~/Desktop/CoverageNet/src/08_writeup/images/ManCoverageEx.gif",
           animate.man.play,
           fps = 10,
           nframe = man.play.length.ex,
-          height = 800,
-          width = 800,
+          height = 600,
+          width = 600,
           res = 120)
 
 # animating the zone coverage play
@@ -157,6 +164,7 @@ animate.zone.play = zone.coverage.play.info$animate.play
 zone.play.length.ex = zone.coverage.play.info$play.length.ex
 
 animate(animate.zone.play, fps = 10, nframe = zone.play.length.ex)
+zone_gif = animate(animate.zone.play, fps = 10, nframe = zone.play.length.ex)
 animate(animate.zone.play, 
         nframes = zone.play.length.ex, device = "png", fps = 10,
         renderer = file_renderer("~/Desktop/CoverageNet/src/08_writeup/images/ZoneCoverageEx.png", 
@@ -173,6 +181,31 @@ anim_save("~/Desktop/CoverageNet/src/08_writeup/images/ZoneCoverageEx.gif",
           width = 800,
           res = 120)
 
+man_mgif <- image_read(man_gif)
+zone_mgif <- image_read(zone_gif)
+
+man_mgif[1]
+
+new_gif <- image_append(c(man_mgif[1], zone_mgif[1]))
+for(i in 2:zone.play.length.ex){
+  if(i > man.play.length.ex){
+    combined <- image_append(c(man_mgif[man.play.length.ex], zone_mgif[i]))
+  }else{
+    combined <- image_append(c(man_mgif[i], zone_mgif[i]))
+  }
+  new_gif <- c(new_gif, combined)
+}
+
+new_gif
+
+
+anim_save("~/Desktop/CoverageNet/src/08_writeup/images/CoverageEx.gif",
+          new_gif,
+          fps = 10,
+          nframe = zone.play.length.ex,
+          height = 400,
+          width = 600,
+          res = 100)
 
   
   
